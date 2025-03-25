@@ -6,13 +6,41 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { ScoringConfig } from "@shared/schema";
-import { Loader2, RefreshCw } from "lucide-react";
+import { 
+  ScoringConfig, 
+  CujCategory,
+  Cuj,
+  Task,
+  TaskWithCategory
+} from "@shared/schema";
+import { 
+  Loader2, 
+  RefreshCw, 
+  FileText, 
+  Layers, 
+  FolderTree,
+  ChevronDown,
+  ChevronUp,
+  Search
+} from "lucide-react";
 import { formatDateTime } from "@/lib/utils";
+import { 
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableHead, 
+  TableHeader, 
+  TableRow 
+} from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function AdminDashboard() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  
+  // State for data table searches and filters
+  const [searchTerm, setSearchTerm] = useState("");
+  const [activeTab, setActiveTab] = useState("config");
   
   // State for tracking if weights have been changed
   const [taskWeightsChanged, setTaskWeightsChanged] = useState(false);
@@ -26,6 +54,21 @@ export default function AdminDashboard() {
   // Fetch CUJ data sync status
   const { data: cujSyncStatus, isLoading: isLoadingCujStatus } = useQuery<{ lastSync: string; status: string }>({
     queryKey: ['/api/admin/cuj-sync-status'],
+  });
+  
+  // Fetch CUJ categories
+  const { data: categories, isLoading: isLoadingCategories } = useQuery<CujCategory[]>({
+    queryKey: ['/api/cuj-categories'],
+  });
+  
+  // Fetch CUJs
+  const { data: cujs, isLoading: isLoadingCujs } = useQuery<Cuj[]>({
+    queryKey: ['/api/cujs'],
+  });
+  
+  // Fetch Tasks
+  const { data: tasks, isLoading: isLoadingTasks } = useQuery<TaskWithCategory[]>({
+    queryKey: ['/api/tasks'],
   });
   
   // State for task level weights
@@ -159,8 +202,23 @@ export default function AdminDashboard() {
     syncCujData.mutate();
   };
   
+  // Filter tasks by category
+  const getTasksByCategory = (categoryId: number) => {
+    if (!tasks) return [];
+    return tasks.filter(task => task.cuj.category.id === categoryId);
+  };
+  
+  // Filter function for search
+  const filterBySearchTerm = (item: any) => {
+    if (!searchTerm.trim()) return true;
+    
+    const searchLower = searchTerm.toLowerCase();
+    return item.name.toLowerCase().includes(searchLower) || 
+           (item.description && item.description.toLowerCase().includes(searchLower));
+  };
+  
   // Show loading state
-  if (isLoadingConfig || isLoadingCujStatus) {
+  if (isLoadingConfig || isLoadingCujStatus || isLoadingCategories || isLoadingCujs || isLoadingTasks) {
     return (
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-20 sm:pb-6">
         <div className="mb-6">
@@ -202,10 +260,18 @@ export default function AdminDashboard() {
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-20 sm:pb-6">
       <div className="mb-6">
-        <h2 className="text-2xl font-medium text-foreground">Admin Configuration</h2>
-        <p className="text-muted-foreground mt-1">Configure scoring parameters and weights for the evaluation system.</p>
+        <h2 className="text-2xl font-medium text-foreground">Admin Dashboard</h2>
+        <p className="text-muted-foreground mt-1">Manage configuration and view CUJ data.</p>
       </div>
-
+      
+      <Tabs defaultValue={activeTab} onValueChange={setActiveTab} className="mb-6">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="config">Configuration</TabsTrigger>
+          <TabsTrigger value="data">CUJ Data Tables</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="config" className="space-y-6 mt-6">
+      
       <div className="space-y-6">
         {/* Task Score Configuration */}
         <Card className="overflow-hidden">
@@ -432,6 +498,149 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
       </div>
+      
+        </TabsContent>
+        
+        <TabsContent value="data" className="mt-6">
+          <div className="flex mb-4 items-center">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="search"
+                  placeholder="Search CUJs, tasks, or categories..."
+                  className="pl-8"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+        
+          {/* Categories Table */}
+          <Card className="mb-6 overflow-hidden">
+            <div className="p-4 bg-primary bg-opacity-5 border-b border-gray-200 flex items-center">
+              <FolderTree className="h-5 w-5 mr-2 text-primary" />
+              <h3 className="font-medium text-lg text-primary">Categories</h3>
+            </div>
+            
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-16">ID</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead className="w-20">Icon</TableHead>
+                    <TableHead className="w-24 text-right">Tasks</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {categories?.filter(filterBySearchTerm).map((category) => {
+                    const categoryTasks = getTasksByCategory(category.id);
+                    return (
+                      <TableRow key={category.id}>
+                        <TableCell className="font-mono">{category.id}</TableCell>
+                        <TableCell className="font-medium">{category.name}</TableCell>
+                        <TableCell>{category.description || "-"}</TableCell>
+                        <TableCell>{category.icon || "-"}</TableCell>
+                        <TableCell className="text-right">{categoryTasks.length}</TableCell>
+                      </TableRow>
+                    );
+                  })}
+                  {categories?.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-4 text-muted-foreground">No categories found</TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </Card>
+          
+          {/* CUJs Table */}
+          <Card className="mb-6 overflow-hidden">
+            <div className="p-4 bg-primary bg-opacity-5 border-b border-gray-200 flex items-center">
+              <Layers className="h-5 w-5 mr-2 text-primary" />
+              <h3 className="font-medium text-lg text-primary">Critical User Journeys</h3>
+            </div>
+            
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-16">ID</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Category</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead className="w-24 text-right">Tasks</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {cujs?.filter(filterBySearchTerm).map((cuj) => {
+                    const cujCategory = categories?.find(cat => cat.id === cuj.categoryId);
+                    const cujTasks = tasks?.filter(task => task.cuj.id === cuj.id) || [];
+                    return (
+                      <TableRow key={cuj.id}>
+                        <TableCell className="font-mono">{cuj.id}</TableCell>
+                        <TableCell className="font-medium">{cuj.name}</TableCell>
+                        <TableCell>{cujCategory?.name || "-"}</TableCell>
+                        <TableCell>{cuj.description || "-"}</TableCell>
+                        <TableCell className="text-right">{cujTasks.length}</TableCell>
+                      </TableRow>
+                    );
+                  })}
+                  {cujs?.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-4 text-muted-foreground">No CUJs found</TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </Card>
+          
+          {/* Tasks Table */}
+          <Card className="overflow-hidden">
+            <div className="p-4 bg-primary bg-opacity-5 border-b border-gray-200 flex items-center">
+              <FileText className="h-5 w-5 mr-2 text-primary" />
+              <h3 className="font-medium text-lg text-primary">Tasks</h3>
+            </div>
+            
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-16">ID</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead>CUJ</TableHead>
+                    <TableHead>Category</TableHead>
+                    <TableHead>Prerequisites</TableHead>
+                    <TableHead>Expected Outcome</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {tasks?.filter(filterBySearchTerm).map((task) => (
+                    <TableRow key={task.id}>
+                      <TableCell className="font-mono">{task.id}</TableCell>
+                      <TableCell className="font-medium">{task.name}</TableCell>
+                      <TableCell>{task.cuj.name}</TableCell>
+                      <TableCell>{task.cuj.category.name}</TableCell>
+                      <TableCell>{task.prerequisites || "-"}</TableCell>
+                      <TableCell>{task.expectedOutcome}</TableCell>
+                    </TableRow>
+                  ))}
+                  {tasks?.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-4 text-muted-foreground">No tasks found</TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
