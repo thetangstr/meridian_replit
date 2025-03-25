@@ -92,6 +92,8 @@ export const reviews = pgTable("reviews", {
   status: text("status").notNull().default("pending"), // pending, in_progress, completed
   startDate: timestamp("start_date").notNull(),
   endDate: timestamp("end_date").notNull(),
+  isPublished: boolean("is_published").default(false).notNull(), // Whether the review is locked and published
+  lastModifiedById: integer("last_modified_by_id").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -102,6 +104,12 @@ export const insertReviewSchema = createInsertSchema(reviews).pick({
   status: true,
   startDate: true,
   endDate: true,
+});
+
+export const updateReviewSchema = createInsertSchema(reviews).pick({
+  status: true,
+  isPublished: true,
+  lastModifiedById: true,
 });
 
 // Task Evaluations
@@ -246,6 +254,7 @@ export type TaskWithCategory = Task & {
 export type ReviewWithDetails = Review & {
   car: Car;
   reviewer: User;
+  lastModifiedBy?: User;
 };
 
 export type TaskEvaluationWithTask = TaskEvaluation & {
