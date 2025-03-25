@@ -90,14 +90,25 @@ function Router() {
 }
 
 function App() {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <AuthenticatedLayout>
-        <Router />
-      </AuthenticatedLayout>
-      <Toaster />
-    </QueryClientProvider>
-  );
+  // Add basic error handling
+  try {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <AuthenticatedLayout>
+          <Router />
+        </AuthenticatedLayout>
+        <Toaster />
+      </QueryClientProvider>
+    );
+  } catch (error) {
+    console.error("Error rendering app:", error);
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-4">
+        <h1 className="text-xl font-bold mb-4">Something went wrong</h1>
+        <p className="text-red-500">{error instanceof Error ? error.message : "Unknown error"}</p>
+      </div>
+    );
+  }
 }
 
 export default App;
