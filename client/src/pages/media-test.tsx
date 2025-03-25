@@ -18,8 +18,9 @@ export default function MediaTestPage() {
         <CardHeader>
           <CardTitle>Media Capture Test</CardTitle>
           <CardDescription>
-            This page allows you to test the media capture functionality.
-            Try adding images and videos, then check if they persist after page refresh.
+            This page allows you to test the media capture and upload functionality.
+            If camera access is not available in this environment, you can directly upload files
+            using the upload buttons. Media items are stored on the server and will persist across sessions.
           </CardDescription>
         </CardHeader>
         <CardContent>

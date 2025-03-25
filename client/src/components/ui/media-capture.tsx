@@ -83,7 +83,7 @@ export function MediaCapture({
     checkCameraSupport();
     
     // If we're on iOS, apply the fix
-    if (/iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream) {
+    if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
       fixIOSSafari();
     }
     
@@ -701,16 +701,41 @@ export function MediaCapture({
             </div>
           )}
 
-          {/* Camera support warning */}
+          {/* Camera support warning with direct upload buttons */}
           {!cameraSupported && (
-            <div className="flex items-center gap-2 p-3 rounded-md bg-amber-50 text-amber-700 text-sm mb-2">
-              <AlertCircle className="h-4 w-4 flex-shrink-0" />
-              <p>Camera access not available. You can still upload files directly.</p>
+            <div className="space-y-3 mb-4">
+              <div className="flex items-center gap-2 p-3 rounded-md bg-amber-50 text-amber-700 text-sm">
+                <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                <p>Camera access not available. Use the buttons below to upload media directly.</p>
+              </div>
+              
+              <div className="flex gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex-1 border-primary text-primary"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isCapturing || media.length >= maxItems}
+                >
+                  <Camera className="mr-1 h-4 w-4" />
+                  Upload Image
+                </Button>
+                <Button
+                  type="button" 
+                  variant="outline"
+                  className="flex-1 border-primary text-primary"
+                  onClick={() => videoInputRef.current?.click()}
+                  disabled={isCapturing || media.length >= maxItems}
+                >
+                  <Video className="mr-1 h-4 w-4" />
+                  Upload Video
+                </Button>
+              </div>
             </div>
           )}
 
-          {/* Capture/Upload Buttons (hidden when camera active) */}
-          {!streamActive && (
+          {/* Capture/Upload Buttons (hidden when camera active or not supported) */}
+          {!streamActive && cameraSupported && (
             <div className="flex gap-3">
               <Button
                 type="button"
