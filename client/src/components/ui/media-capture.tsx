@@ -403,6 +403,9 @@ export function MediaCapture({
             const now = new Date().toISOString();
             console.log(`MediaRecorder onstop at ${now} with ${recordedChunksRef.current.length} chunks`);
             
+            // Reset recording flag but keep camera view open
+            setIsRecording(false);
+            
             // In regular functioning, there should be chunks here
             // If not, the recorder was probably stopped too quickly
             if (recordedChunksRef.current.length === 0) {
@@ -418,10 +421,11 @@ export function MediaCapture({
               console.log("Added dummy chunk to prevent failure");
             }
             
-            // Process the video regardless of UI state
+            // Process the video but DO NOT close the camera view
+            // We want to keep the camera open for potential additional recordings
             processVideoRecording().catch(error => {
               console.error("Error in video processing:", error);
-              setIsRecording(false);
+              // Just reset the recording state, not the camera view
             });
           };
           
@@ -798,32 +802,35 @@ export function MediaCapture({
         // Then stop the recorder only if it's still recording
         if (mediaRecorderRef.current.state === 'recording') {
           try {
+            // This will trigger the onstop event handler, which handles the recording
+            // We intentionally don't clean up resources here to keep the camera open
             mediaRecorderRef.current.stop();
-            console.log("MediaRecorder stopped successfully");
+            console.log("MediaRecorder stopped successfully - processing will begin soon");
           } catch (stopError) {
             console.error("Error stopping recorder:", stopError);
-            cleanupMediaResources();
+            // Don't clean up resources here - we want to keep the camera preview
+            // Just null out the recorder so we can create a new one
+            mediaRecorderRef.current = null;
           }
         } else {
-          console.log("MediaRecorder already inactive, just cleaning up");
-          // If it's already stopped, just clean up the resources
-          cleanupMediaResources();
+          console.log("MediaRecorder already inactive");
+          // Just null out the recorder reference but don't stop the camera
+          mediaRecorderRef.current = null;
         }
       } else {
         console.warn("MediaRecorder not available, nothing to stop");
-        cleanupMediaResources();
       }
     } catch (error) {
       console.error("Critical error in stopRecording:", error);
-      
-      // Safety cleanup in case of catastrophic error
-      cleanupMediaResources();
       
       toast({
         title: "Recording failed",
         description: "A critical error occurred. Please try again.",
         variant: "destructive"
       });
+      
+      // Just reset recording state but keep camera open
+      setIsRecording(false);
     }
   };
   
@@ -889,12 +896,14 @@ export function MediaCapture({
       const updatedMediaWithTemp = [...media, tempItem];
       onChange(updatedMediaWithTemp);
       
-      // Reset camera state
-      setCameraMode(null);
+      // For consistency with video recording, we DON'T reset camera mode here
+      // This way users can continue taking photos without returning to menu
+      // setCameraMode(null);
       
       toast({
         title: "Image captured",
-        description: "Uploading to server..."
+        description: "Uploading to server while keeping camera active...",
+        duration: 3000
       });
       
       try {
@@ -934,8 +943,9 @@ export function MediaCapture({
           onChange(finalUpdatedMedia);
           
           toast({
-            title: "Image captured",
-            description: "Image has been saved to the server."
+            title: "Image uploaded",
+            description: "Image has been saved. You can continue taking photos if needed.",
+            duration: 3000
           });
         } else {
           console.error("Failed to find temporary image in media array");
