@@ -661,81 +661,51 @@ export function MediaCapture({
   const stopRecording = () => {
     console.log("stopRecording called, isRecording:", isRecording, "mediaRecorderRef exists:", !!mediaRecorderRef.current);
     
-    try {
-      // First reset recording state to prevent UI confusion
-      setIsRecording(false);
-      
-      // Then try to properly stop the recording
+    // First reset recording state to prevent UI confusion
+    setIsRecording(false);
+    
+    try {      
+      // Check if we have a MediaRecorder
       if (mediaRecorderRef.current) {
         console.log("Stopping MediaRecorder");
-        try {
-          // First explicitly request the data
-          if (typeof mediaRecorderRef.current.requestData === 'function') {
+        
+        // First explicitly request the data if possible
+        if (typeof mediaRecorderRef.current.requestData === 'function') {
+          try {
             console.log("Explicitly requesting data before stopping");
             mediaRecorderRef.current.requestData();
+          } catch (requestError) {
+            console.warn("Error requesting data:", requestError);
           }
-          
+        }
+        
+        // Then stop the recorder with a small delay
+        try {
           // Small delay to ensure the data is processed before stopping
           setTimeout(() => {
-            if (mediaRecorderRef.current) {
-              mediaRecorderRef.current.stop();
-              console.log("MediaRecorder stopped successfully after data request");
+            try {
+              if (mediaRecorderRef.current) {
+                mediaRecorderRef.current.stop();
+                console.log("MediaRecorder stopped successfully after data request");
+              }
+            } catch (delayedStopError) {
+              console.error("Error in delayed stop:", delayedStopError);
+              cleanupMediaResources();
             }
           }, 100);
         } catch (stopError) {
-          console.error("Error stopping MediaRecorder:", stopError);
-          // If stopping fails, immediately clean up everything
-          recordedChunksRef.current = [];
-          mediaRecorderRef.current = null;
-          
-          if (mediaStreamRef.current) {
-            console.log("Stopping all media tracks due to MediaRecorder stop error");
-            mediaStreamRef.current.getTracks().forEach(track => {
-              console.log(`Force stopping track: ${track.kind}`);
-              track.stop();
-            });
-            mediaStreamRef.current = null;
-          }
-          
-          // Reset camera mode
-          console.log("Resetting camera mode due to error");
-          setCameraMode(null);
-          
-          // Let user know about the error
-          toast({
-            title: "Recording error",
-            description: "Error while stopping recording. Media may not be saved.",
-            variant: "destructive"
-          });
+          console.error("Error scheduling MediaRecorder stop:", stopError);
+          cleanupMediaResources();
         }
       } else {
         console.warn("MediaRecorder not available, nothing to stop");
-        
-        // Still clean up media stream just in case
-        if (mediaStreamRef.current) {
-          console.log("Stopping orphaned media tracks");
-          mediaStreamRef.current.getTracks().forEach(track => track.stop());
-          mediaStreamRef.current = null;
-        }
+        cleanupMediaResources();
       }
     } catch (error) {
       console.error("Critical error in stopRecording:", error);
       
       // Safety cleanup in case of catastrophic error
-      if (mediaStreamRef.current) {
-        try {
-          console.log("Emergency media track cleanup");
-          mediaStreamRef.current.getTracks().forEach(track => track.stop());
-        } catch (cleanupError) {
-          console.error("Even cleanup failed:", cleanupError);
-        }
-        mediaStreamRef.current = null;
-      }
-      
-      mediaRecorderRef.current = null;
-      recordedChunksRef.current = [];
-      setIsRecording(false);
-      setCameraMode(null);
+      cleanupMediaResources();
       
       toast({
         title: "Recording failed",
@@ -743,6 +713,27 @@ export function MediaCapture({
         variant: "destructive"
       });
     }
+  };
+  
+  // Helper function to clean up all media resources
+  const cleanupMediaResources = () => {
+    // Stop all tracks in the media stream
+    if (mediaStreamRef.current) {
+      console.log("Cleaning up media tracks");
+      try {
+        mediaStreamRef.current.getTracks().forEach(track => {
+          console.log(`Stopping track: ${track.kind}`);
+          track.stop();
+        });
+      } catch (trackError) {
+        console.error("Error stopping tracks:", trackError);
+      }
+      mediaStreamRef.current = null;
+    }
+    
+    // Clear recorder
+    mediaRecorderRef.current = null;
+    recordedChunksRef.current = [];
   };
 
   const captureImage = async () => {
