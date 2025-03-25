@@ -484,7 +484,7 @@ export function MediaCapture({
         throw new Error("No video data recorded");
       }
       
-      // Set loading state
+      // Set loading state but keep the camera view open
       setIsLoading(true);
       
       console.log("Processing recorded video chunks:", recordedChunksRef.current.length);
@@ -521,7 +521,8 @@ export function MediaCapture({
       
       toast({
         title: "Video captured",
-        description: "Uploading to server..."
+        description: "Uploading to server while keeping camera active...",
+        duration: 3000
       });
       
       // Upload the video to the server
@@ -560,8 +561,9 @@ export function MediaCapture({
           onChange(finalUpdatedMedia);
           
           toast({
-            title: "Video captured",
-            description: "Video has been saved to the server."
+            title: "Video uploaded",
+            description: "Video has been saved. You can continue recording if needed.",
+            duration: 3000
           });
         } else {
           console.error("Failed to find temporary item in media array");
@@ -569,26 +571,16 @@ export function MediaCapture({
           onChange([...media, mediaItem]);
         }
         
-        console.log("Video successfully processed and uploaded, returning to gallery view");
+        console.log("Video successfully processed and uploaded");
         
-        // First stop all media tracks properly
-        if (mediaStreamRef.current) {
-          console.log("Stopping media tracks after successful upload");
-          mediaStreamRef.current.getTracks().forEach(track => {
-            console.log(`Stopping track: ${track.kind}`);
-            track.stop();
-          });
-          mediaStreamRef.current = null;
-        }
+        // We DON'T exit the camera view here - that's the key change
+        // Allow user to keep recording if they want
         
-        // Then reset camera mode to avoid React state updates during navigation
-        console.log("Setting camera mode to null");
-        setCameraMode(null);
       } catch (uploadError) {
         console.error("Video upload error:", uploadError);
         toast({
           title: "Video upload failed",
-          description: "Failed to upload the video. Please try again.",
+          description: "Failed to upload the video. You can try again.",
           variant: "destructive"
         });
         
@@ -598,9 +590,6 @@ export function MediaCapture({
         
         // Revoke the URL
         revokeSafeObjectURL(tempItem.url);
-        
-        // Don't stop camera on error - just reset the recording state
-        setIsRecording(false);
       }
     } catch (error) {
       console.error("Video processing error:", error);
@@ -609,14 +598,15 @@ export function MediaCapture({
         description: "Failed to process the video. Please try again.",
         variant: "destructive"
       });
-      
-      // Don't stop camera on error - just reset the recording state
-      setIsRecording(false);
     } finally {
-      // Reset recorder state
+      // Reset recorder state but don't close the camera
       recordedChunksRef.current = [];
       mediaRecorderRef.current = null;
       setIsLoading(false);
+      setIsRecording(false);
+      
+      // We're intentionally NOT calling setCameraMode(null) here
+      // to keep the camera view open for more recordings
     }
   };
 
