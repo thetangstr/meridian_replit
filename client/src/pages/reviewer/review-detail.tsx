@@ -62,6 +62,8 @@ export default function ReviewDetail() {
   
   // Store task evaluations data
   const [taskEvaluations, setTaskEvaluations] = useState<Record<number, TaskEvaluation>>({});
+  // Store category evaluations data
+  const [categoryEvaluations, setCategoryEvaluations] = useState<Record<number, CategoryEvaluation>>({});
   
   // Fetch review details
   const { data: review, isLoading: isLoadingReview } = useQuery<ReviewWithDetails>({
@@ -84,6 +86,12 @@ export default function ReviewDetail() {
     enabled: !!reviewId && !!tasks && Array.isArray(tasks.completedTaskIds) && tasks.completedTaskIds.length > 0,
   });
   
+  // Fetch category evaluations for this review
+  const { data: categoryEvaluationsData, isLoading: isLoadingCategoryEvals } = useQuery<CategoryEvaluation[]>({
+    queryKey: [`/api/reviews/${reviewId}/category-evaluations`],
+    enabled: !!reviewId && !!categories && categories.length > 0,
+  });
+  
   // Process task evaluations when data is loaded
   useEffect(() => {
     if (taskEvaluationsData && taskEvaluationsData.length > 0) {
@@ -95,8 +103,19 @@ export default function ReviewDetail() {
     }
   }, [taskEvaluationsData]);
   
+  // Process category evaluations when data is loaded
+  useEffect(() => {
+    if (categoryEvaluationsData && categoryEvaluationsData.length > 0) {
+      const categoryEvalsMap: Record<number, CategoryEvaluation> = {};
+      categoryEvaluationsData.forEach(catEval => {
+        categoryEvalsMap[catEval.categoryId] = catEval;
+      });
+      setCategoryEvaluations(categoryEvalsMap);
+    }
+  }, [categoryEvaluationsData]);
+  
   // Loading states
-  const isLoading = isLoadingReview || isLoadingCategories || isLoadingTasks || isLoadingTaskEvals;
+  const isLoading = isLoadingReview || isLoadingCategories || isLoadingTasks || isLoadingTaskEvals || isLoadingCategoryEvals;
   
   // Update review status mutation
   const updateReviewStatus = useMutation({
@@ -200,7 +219,7 @@ export default function ReviewDetail() {
     return tasks?.completedTaskIds.includes(taskId) || false;
   };
   
-  // Calculate category score based on task evaluations
+  // Calculate category score based on task evaluations and category evaluations
   const calculateCategoryScore = (categoryId: number) => {
     if (!tasks || !tasks.tasks) {
       return null;
@@ -208,13 +227,16 @@ export default function ReviewDetail() {
     
     const categoryTasks = tasks.tasks.filter(task => getCategoryByCujId(task.cujId)?.id === categoryId);
     const completedTasks = categoryTasks.filter(task => isTaskCompleted(task.id));
+    const categoryEvaluation = categoryEvaluations[categoryId];
     
-    if (completedTasks.length === 0) {
+    // If no tasks are completed and no category evaluation exists, return null
+    if (completedTasks.length === 0 && !categoryEvaluation) {
       return null;
     }
     
-    let totalScore = 0;
-    let totalTasks = 0;
+    // Calculate task average score
+    let taskAvgScore = 0;
+    let totalTasksWithScores = 0;
     
     completedTasks.forEach(task => {
       const evaluation = taskEvaluations[task.id];
@@ -229,14 +251,44 @@ export default function ReviewDetail() {
           ((evaluation.usabilityScore || 0) + (evaluation.visualsScore || 0)) / 2;
         
         if (taskScore > 0) {
-          totalScore += taskScore;
-          totalTasks++;
+          taskAvgScore += taskScore;
+          totalTasksWithScores++;
         }
       }
     });
     
-    return totalTasks > 0 
-      ? parseFloat((totalScore / totalTasks).toFixed(1)) 
+    // If we have tasks with scores, calculate their average
+    if (totalTasksWithScores > 0) {
+      taskAvgScore = taskAvgScore / totalTasksWithScores;
+    }
+    
+    // If we have a category evaluation, calculate the combined score
+    if (categoryEvaluation) {
+      // Get the responsiveness, writing and emotional scores (default to 0 if undefined)
+      const responsivenessScore = categoryEvaluation.responsivenessScore || 0;
+      const writingScore = categoryEvaluation.writingScore || 0;
+      const emotionalScore = categoryEvaluation.emotionalScore || 0;
+      
+      // Weights for different components of the category score
+      // These should match the weights in the admin settings
+      const taskWeight = 0.5; // 50% weight to task average 
+      const responsivenessWeight = 0.25; // 25% weight to responsiveness
+      const writingWeight = 0.15; // 15% weight to writing
+      const emotionalWeight = 0.1; // 10% weight to emotional score (bonus)
+      
+      // Calculate weighted score
+      const weightedScore = 
+        (taskAvgScore * taskWeight) +
+        (responsivenessScore * responsivenessWeight) +
+        (writingScore * writingWeight) +
+        (emotionalScore * emotionalWeight);
+      
+      return parseFloat(weightedScore.toFixed(1));
+    }
+    
+    // If no category evaluation but we have task scores, return task average
+    return totalTasksWithScores > 0 
+      ? parseFloat(taskAvgScore.toFixed(1)) 
       : null;
   };
   
