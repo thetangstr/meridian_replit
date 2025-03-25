@@ -351,10 +351,47 @@ export class MemStorage implements IStorage {
     );
   }
   
-  async getTasksForReview(reviewId: number): Promise<Task[]> {
-    // In a real app, this would filter tasks based on the review's car and CUJs
-    // Here we're just returning all tasks
-    return Array.from(this.tasks.values());
+  async getTasksForReview(reviewId: number): Promise<TaskWithCategory[]> {
+    // Get all tasks
+    const allTasks = Array.from(this.tasks.values());
+    
+    // Enhance each task with its CUJ and category information
+    const tasksWithCategories = await Promise.all(
+      allTasks.map(async (task) => {
+        const cuj = await this.getCuj(task.cujId);
+        let category = null;
+        
+        if (cuj) {
+          category = await this.getCujCategory(cuj.categoryId);
+        }
+        
+        return {
+          ...task,
+          cuj: cuj ? {
+            ...cuj,
+            category: category || {
+              id: 0,
+              name: "Unknown",
+              description: null,
+              icon: null
+            }
+          } : {
+            id: 0,
+            name: "Unknown",
+            description: null,
+            categoryId: 0,
+            category: {
+              id: 0,
+              name: "Unknown",
+              description: null,
+              icon: null
+            }
+          }
+        } as TaskWithCategory;
+      })
+    );
+    
+    return tasksWithCategories;
   }
   
   async createTask(task: InsertTask): Promise<Task> {

@@ -247,15 +247,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
     // Check if user has access to this review
-    if (req.user.role !== 'admin' && review.reviewerId !== req.user.id) {
+    if (req.user?.role !== 'admin' && review.reviewerId !== req.user?.id) {
       return res.status(403).json({ error: 'You do not have permission to view this review' });
     }
     
     try {
-      const tasks = await storage.getTasksForReview(reviewId);
+      const tasksWithCategories = await storage.getTasksForReview(reviewId);
       const completedTaskIds = await storage.getCompletedTaskIds(reviewId);
       
-      res.json({ tasks, completedTaskIds });
+      res.json({ tasks: tasksWithCategories, completedTaskIds });
     } catch (error) {
       res.status(500).json({ error: String(error) });
     }
