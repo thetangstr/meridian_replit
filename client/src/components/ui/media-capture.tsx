@@ -53,7 +53,39 @@ export function MediaCapture({
       }
     };
     
+    // Fix for iOS Safari
+    const fixIOSSafari = () => {
+      // iOS Safari requires a user gesture to enable audio/video
+      // We'll add an event listener for the first click on the document
+      // which will attempt to get user media (but not actually use it)
+      const handleInitialTouch = () => {
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+          navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+            .then(stream => {
+              // Immediately stop all tracks - we just needed permission
+              stream.getTracks().forEach(track => track.stop());
+            })
+            .catch(err => {
+              console.warn("Permission request on touch failed:", err);
+            });
+        }
+        
+        // Remove event listener after first touch
+        document.removeEventListener('touchstart', handleInitialTouch);
+        document.removeEventListener('click', handleInitialTouch);
+      };
+      
+      // Add event listeners for both touch and click events
+      document.addEventListener('touchstart', handleInitialTouch, { once: true });
+      document.addEventListener('click', handleInitialTouch, { once: true });
+    };
+    
     checkCameraSupport();
+    
+    // If we're on iOS, apply the fix
+    if (/iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream) {
+      fixIOSSafari();
+    }
     
     // Cleanup on unmount
     return () => {
@@ -78,11 +110,15 @@ export function MediaCapture({
         return;
       }
       
+      // Check if we're on a mobile device
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      
+      // Optimize camera constraints based on device type and orientation
       const constraints: MediaStreamConstraints = { 
         video: {
-          facingMode: 'environment',
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
+          facingMode: 'environment', // Use back camera by default
+          width: { ideal: isMobile ? 720 : 1280 },
+          height: { ideal: isMobile ? 1280 : 720 }
         }
       };
       
@@ -96,8 +132,15 @@ export function MediaCapture({
       
       if (videoPreviewRef.current) {
         videoPreviewRef.current.srcObject = stream;
-        videoPreviewRef.current.play();
-        setStreamActive(true);
+        
+        // Wait for video to be ready before playing
+        videoPreviewRef.current.onloadedmetadata = () => {
+          if (videoPreviewRef.current) {
+            videoPreviewRef.current.play()
+              .catch(err => console.error("Error playing video stream:", err));
+            setStreamActive(true);
+          }
+        };
       }
       
       // Set up video recording if in video mode
@@ -256,7 +299,33 @@ export function MediaCapture({
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
       
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      // Check if we're on a mobile device
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      
+      if (isMobile && video.videoWidth > video.videoHeight) {
+        // If on mobile and video is landscape, handle orientation
+        // Save context state
+        ctx.save();
+        
+        // Translate and rotate canvas for correct orientation
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+        ctx.rotate(0); // Adjust rotation if needed for specific devices
+        
+        // Draw the image rotated
+        ctx.drawImage(
+          video, 
+          -canvas.width / 2, 
+          -canvas.height / 2,
+          canvas.width,
+          canvas.height
+        );
+        
+        // Restore context state
+        ctx.restore();
+      } else {
+        // Standard drawing for desktop or portrait mode
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      }
       
       // Convert canvas to blob
       canvas.toBlob(async (blob) => {
