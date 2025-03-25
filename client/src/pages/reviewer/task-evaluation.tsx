@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
@@ -14,6 +14,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { Task as BaseTask, TaskEvaluation, scoringScaleDescriptions } from "@shared/schema";
 import { MediaCapture } from "@/components/ui/media-capture";
 import { useToast } from "@/hooks/use-toast";
+import { CSSTransition, TransitionGroup } from "react-transition-group";
 
 // Extend the base Task type to include the cuj property with category data
 type Task = BaseTask & { 
@@ -379,10 +380,10 @@ export default function TaskEvaluationPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormControl>
-                      <div className="flex flex-col space-y-4">
-                        <div className="flex justify-between w-full">
+                      <div className="flex flex-col space-y-8">
+                        <div className="grid grid-cols-4 w-full">
                           {Object.entries(scoringScaleDescriptions.usability).map(([value, { label }]) => (
-                            <div key={value} className="flex flex-col items-center">
+                            <div key={value} className="flex flex-col items-center justify-center">
                               <span className="font-medium text-sm">{label}</span>
                               <span className="text-xs">{value}</span>
                             </div>
@@ -391,19 +392,21 @@ export default function TaskEvaluationPage() {
                         <RadioGroup 
                           onValueChange={(value) => field.onChange(Number(value))} 
                           defaultValue={field.value?.toString()}
-                          className="flex w-full justify-between"
+                          className="grid grid-cols-4 w-full gap-4"
                         >
                           {Object.entries(scoringScaleDescriptions.usability).map(([value, { label, description }]) => (
-                            <div key={value} className="flex flex-col items-center">
-                              <RadioGroupItem value={value} id={`usability-${value}`} 
-                                className={`w-10 h-10 rounded-full border-2 ${
-                                  Number(value) === 1 ? 'border-score-poor bg-score-poor/20' : 
-                                  Number(value) === 2 ? 'border-score-fair bg-score-fair/20' : 
-                                  Number(value) === 3 ? 'border-score-good bg-score-good/20' : 
-                                  'border-score-excellent bg-score-excellent/20'
-                                }`} 
-                              />
-                              <div className="mt-2 w-32 text-center">
+                            <div key={value} className="flex flex-col items-center justify-center">
+                              <div className="flex justify-center">
+                                <RadioGroupItem value={value} id={`usability-${value}`} 
+                                  className={`w-10 h-10 rounded-full border-2 ${
+                                    Number(value) === 1 ? 'border-score-poor bg-score-poor/20' : 
+                                    Number(value) === 2 ? 'border-score-fair bg-score-fair/20' : 
+                                    Number(value) === 3 ? 'border-score-good bg-score-good/20' : 
+                                    'border-score-excellent bg-score-excellent/20'
+                                  }`} 
+                                />
+                              </div>
+                              <div className="mt-2 text-center px-2">
                                 <p className="text-xs text-muted-foreground">{description}</p>
                               </div>
                             </div>
@@ -432,10 +435,10 @@ export default function TaskEvaluationPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormControl>
-                      <div className="flex flex-col space-y-4">
-                        <div className="flex justify-between w-full">
+                      <div className="flex flex-col space-y-8">
+                        <div className="grid grid-cols-4 w-full">
                           {Object.entries(scoringScaleDescriptions.visuals).map(([value, { label }]) => (
-                            <div key={value} className="flex flex-col items-center">
+                            <div key={value} className="flex flex-col items-center justify-center">
                               <span className="font-medium text-sm">{label}</span>
                               <span className="text-xs">{value}</span>
                             </div>
@@ -444,19 +447,21 @@ export default function TaskEvaluationPage() {
                         <RadioGroup 
                           onValueChange={(value) => field.onChange(Number(value))} 
                           defaultValue={field.value?.toString()}
-                          className="flex w-full justify-between"
+                          className="grid grid-cols-4 w-full gap-4"
                         >
                           {Object.entries(scoringScaleDescriptions.visuals).map(([value, { label, description }]) => (
-                            <div key={value} className="flex flex-col items-center">
-                              <RadioGroupItem value={value} id={`visuals-${value}`} 
-                                className={`w-10 h-10 rounded-full border-2 ${
-                                  Number(value) === 1 ? 'border-score-poor bg-score-poor/20' : 
-                                  Number(value) === 2 ? 'border-score-fair bg-score-fair/20' : 
-                                  Number(value) === 3 ? 'border-score-good bg-score-good/20' : 
-                                  'border-score-excellent bg-score-excellent/20'
-                                }`} 
-                              />
-                              <div className="mt-2 w-32 text-center">
+                            <div key={value} className="flex flex-col items-center justify-center">
+                              <div className="flex justify-center">
+                                <RadioGroupItem value={value} id={`visuals-${value}`} 
+                                  className={`w-10 h-10 rounded-full border-2 ${
+                                    Number(value) === 1 ? 'border-score-poor bg-score-poor/20' : 
+                                    Number(value) === 2 ? 'border-score-fair bg-score-fair/20' : 
+                                    Number(value) === 3 ? 'border-score-good bg-score-good/20' : 
+                                    'border-score-excellent bg-score-excellent/20'
+                                  }`} 
+                                />
+                              </div>
+                              <div className="mt-2 text-center px-2">
                                 <p className="text-xs text-muted-foreground">{description}</p>
                               </div>
                             </div>
