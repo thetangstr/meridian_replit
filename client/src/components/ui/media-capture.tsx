@@ -678,18 +678,14 @@ export function MediaCapture({
             variant="outline"
             size="lg"
             className="flex flex-col items-center justify-center h-24 py-2"
-            onClick={() => switchCameraMode(uploadType)}
+            onClick={() => switchCameraMode('image')} // Always start in image mode, toggle happens in camera
             disabled={isLoading || media.length >= maxItems}
           >
             <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-1">
-              {uploadType === 'image' ? (
-                <CameraIcon className="h-6 w-6 text-primary" />
-              ) : (
-                <Video className="h-6 w-6 text-primary" />
-              )}
+              <CameraIcon className="h-6 w-6 text-primary" />
             </div>
             <span className="text-sm font-medium">
-              {uploadType === 'image' ? 'Take Photo' : 'Record Video'}
+              Camera
             </span>
           </Button>
           
@@ -697,14 +693,21 @@ export function MediaCapture({
             variant="outline"
             size="lg"
             className="flex flex-col items-center justify-center h-24 py-2"
-            onClick={() => uploadType === 'image' ? fileInputRef.current?.click() : videoInputRef.current?.click()}
+            onClick={() => {
+              // Decide which file input to show based on current uploadType
+              if (uploadType === 'image') {
+                fileInputRef.current?.click();
+              } else {
+                videoInputRef.current?.click();
+              }
+            }}
             disabled={isLoading || media.length >= maxItems}
           >
             <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-1">
               <Upload className="h-6 w-6 text-primary" />
             </div>
             <span className="text-sm font-medium">
-              {uploadType === 'image' ? 'Upload Photo' : 'Upload Video'}
+              Upload File
             </span>
           </Button>
           
