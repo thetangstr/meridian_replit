@@ -378,12 +378,25 @@ export function MediaCapture({
       } else {
         // Set up MediaRecorder but don't start it yet
         try {
-          // Try to use the most basic, universally supported codec options
+          // Try to use codecs that are more widely supported
           let options = {};
           
-          if (MediaRecorder.isTypeSupported('video/webm')) {
-            options = { mimeType: 'video/webm' };
-            console.log("Using video/webm format");
+          // The order is important - try best quality first, then fallback options
+          const possibleTypes = [
+            'video/webm;codecs=vp9,opus',
+            'video/webm;codecs=vp8,opus', 
+            'video/webm;codecs=h264,opus',
+            'video/mp4;codecs=h264,aac',
+            'video/webm',
+            'video/mp4'
+          ];
+          
+          for (const type of possibleTypes) {
+            if (MediaRecorder.isTypeSupported(type)) {
+              options = { mimeType: type };
+              console.log(`Using ${type} format for video recording - browser confirms support`);
+              break;
+            }
           }
           
           console.log("Creating (but not starting) MediaRecorder");
@@ -483,8 +496,11 @@ export function MediaCapture({
       
       console.log("Processing recorded video chunks:", recordedChunksRef.current.length);
       
-      // Process the recorded chunks
-      const videoBlob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
+      // Process the recorded chunks - use the first chunk's type if available, fallback to webm
+      const firstChunk = recordedChunksRef.current[0];
+      const detectedType = firstChunk && firstChunk.type ? firstChunk.type : 'video/webm';
+      console.log(`Creating video blob with type: ${detectedType}`);
+      const videoBlob = new Blob(recordedChunksRef.current, { type: detectedType });
       console.log("Created video blob of size:", videoBlob.size);
       
       const tempVideoUrl = createSafeObjectURL(videoBlob);
@@ -520,7 +536,9 @@ export function MediaCapture({
       
       // Upload the video to the server
       const formData = new FormData();
-      formData.append('file', videoBlob, `recording-${Date.now()}.webm`);
+      const fileExtension = detectedType.includes('mp4') ? 'mp4' : 'webm';
+      console.log(`Using file extension .${fileExtension} based on detected type ${detectedType}`);
+      formData.append('file', videoBlob, `recording-${Date.now()}.${fileExtension}`);
       
       try {
         const response = await fetch('/api/media/upload', {
