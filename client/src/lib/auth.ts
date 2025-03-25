@@ -81,6 +81,7 @@ export const useAuth = create<AuthState>((set) => ({
       
       // Manually invalidate the session storage to ensure complete logout
       window.sessionStorage.clear();
+      localStorage.removeItem('autoLogin'); // Clear auto-login flag if it exists
       
       // Redirect to login on next execution cycle
       setTimeout(() => {
@@ -124,25 +125,34 @@ export const useAuth = create<AuthState>((set) => ({
           console.log('Not authenticated (401)');
           set({ isAuthenticated: false, user: null, loading: false });
           
-          // Force a login for development testing purposes
-          console.log('Attempting auto-login (development only)...');
-          try {
-            // In development, attempt an auto-login for convenience
-            const loginRes = await fetch('/api/auth/login', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ username: 'reviewer', password: 'review123' }),
-              credentials: 'include',
-            });
-            
-            if (loginRes.ok) {
-              const user = await loginRes.json();
-              console.log('Auto-login successful:', user);
-              set({ isAuthenticated: true, user, loading: false });
-              return;
+          // Auto-login for development is disabled by default
+          // To enable, add ?auto-login=true to the URL or set localStorage.autoLogin = 'true'
+          const autoLoginEnabled = 
+            window.location.search.includes('auto-login=true') || 
+            localStorage.getItem('autoLogin') === 'true';
+          
+          if (autoLoginEnabled) {
+            console.log('Attempting auto-login (development only)...');
+            try {
+              // In development, attempt an auto-login for convenience
+              const loginRes = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: 'reviewer', password: 'review123' }),
+                credentials: 'include',
+              });
+              
+              if (loginRes.ok) {
+                const user = await loginRes.json();
+                console.log('Auto-login successful:', user);
+                set({ isAuthenticated: true, user, loading: false });
+                return;
+              }
+            } catch (loginErr) {
+              console.error('Auto-login failed:', loginErr);
             }
-          } catch (loginErr) {
-            console.error('Auto-login failed:', loginErr);
+          } else {
+            console.log('Auto-login disabled. Add ?auto-login=true to URL to enable.');
           }
           return;
         }
