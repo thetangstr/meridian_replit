@@ -552,15 +552,27 @@ export default function ReviewDetail() {
                               </div>
                               <div className="flex items-center space-x-1">
                                 <span className="text-xs text-muted-foreground">Usability:</span>
-                                <span className={`text-xs font-medium ${getScoreColorClass(taskEvaluations[task.id]?.usabilityScore ? (taskEvaluations[task.id]?.usabilityScore / 4) * 100 : null)}`}>
-                                  {taskEvaluations[task.id]?.usabilityScore ? `${taskEvaluations[task.id]?.usabilityScore}/4` : "N/A"}
-                                </span>
+                                {(() => {
+                                  const score = taskEvaluations[task.id]?.usabilityScore;
+                                  const scorePercentage = score ? (score / 4) * 100 : null;
+                                  return (
+                                    <span className={`text-xs font-medium ${getScoreColorClass(scorePercentage)}`}>
+                                      {score ? `${score}/4` : "N/A"}
+                                    </span>
+                                  );
+                                })()}
                               </div>
                               <div className="flex items-center space-x-1">
                                 <span className="text-xs text-muted-foreground">Visuals:</span>
-                                <span className={`text-xs font-medium ${getScoreColorClass(taskEvaluations[task.id]?.visualsScore ? (taskEvaluations[task.id]?.visualsScore / 4) * 100 : null)}`}>
-                                  {taskEvaluations[task.id]?.visualsScore ? `${taskEvaluations[task.id]?.visualsScore}/4` : "N/A"}
-                                </span>
+                                {(() => {
+                                  const score = taskEvaluations[task.id]?.visualsScore;
+                                  const scorePercentage = score ? (score / 4) * 100 : null;
+                                  return (
+                                    <span className={`text-xs font-medium ${getScoreColorClass(scorePercentage)}`}>
+                                      {score ? `${score}/4` : "N/A"}
+                                    </span>
+                                  );
+                                })()}
                               </div>
                             </div>
                             <Button 

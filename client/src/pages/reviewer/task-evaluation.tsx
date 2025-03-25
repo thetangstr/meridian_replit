@@ -81,8 +81,8 @@ export default function TaskEvaluationPage() {
     resolver: zodResolver(taskEvaluationSchema),
     defaultValues: {
       doable: evaluation?.doable ?? true,
-      usabilityScore: evaluation?.usabilityScore ?? 3,
-      visualsScore: evaluation?.visualsScore ?? 3,
+      usabilityScore: evaluation?.usabilityScore ?? undefined,
+      visualsScore: evaluation?.visualsScore ?? undefined,
       media: evaluation?.media ?? [],
     },
   });
@@ -141,23 +141,34 @@ export default function TaskEvaluationPage() {
       // Show appropriate toast message based on what's happening next
       if (nextTask) {
         toast({
-          title: "Evaluation Saved",
+          title: "✅ Evaluation Saved",
           description: `Your evaluation has been saved. Moving to the next task in ${currentCategory}.`,
+          variant: "default",
+          className: "bg-green-100 text-green-900 border-green-500 border font-medium",
         });
+        
+        // Add a transition effect before navigation
+        document.body.classList.add('page-transition-out');
+        
         // Encode the category ID so the review page knows which category to expand
         setTimeout(() => {
           setLocation(`/reviews/${reviewId}/tasks/${nextTask.id}?category=${nextTask.cuj?.categoryId || ''}`);
-        }, 1000); // Short delay to let the user see the toast
+        }, 1200); // Increased delay to accommodate transition
       } else {
         toast({
-          title: "Category Complete!",
+          title: "🎉 Category Complete!",
           description: `You've completed all tasks in ${currentCategory}. Returning to review summary.`,
           variant: "default",
+          className: "bg-blue-100 text-blue-900 border-blue-500 border font-medium",
         });
+        
+        // Add a transition effect before navigation
+        document.body.classList.add('page-transition-out');
+        
         // Return to review page with the current category expanded
         setTimeout(() => {
           setLocation(`/reviews/${reviewId}${currentCategoryId ? `?expandCategory=${currentCategoryId}` : ''}`);
-        }, 1000); // Short delay to let the user see the toast
+        }, 1200); // Increased delay to accommodate transition
       }
     },
     onError: (error) => {
