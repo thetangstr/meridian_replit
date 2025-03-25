@@ -194,8 +194,7 @@ export function MediaCapture({
                 
                 const response = await fetch('/api/media/upload', {
                   method: 'POST',
-                  body: formData,
-                  credentials: 'include'
+                  body: formData
                 });
                 
                 if (!response.ok) {
