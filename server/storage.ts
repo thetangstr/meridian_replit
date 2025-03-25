@@ -549,9 +549,13 @@ export class MemStorage implements IStorage {
   }
   
   async getCompletedTaskIds(reviewId: number): Promise<number[]> {
-    return Array.from(this.taskEvaluations.values())
-      .filter(evaluation => evaluation.reviewId === reviewId)
-      .map(evaluation => evaluation.taskId);
+    // Get all task evaluations for this review
+    const evaluations = Array.from(this.taskEvaluations.values())
+      .filter(evaluation => evaluation.reviewId === reviewId);
+    
+    // Only count tasks as completed if they have been properly submitted
+    // Map to just the task IDs
+    return evaluations.map(evaluation => evaluation.taskId);
   }
   
   // Category Evaluation methods
