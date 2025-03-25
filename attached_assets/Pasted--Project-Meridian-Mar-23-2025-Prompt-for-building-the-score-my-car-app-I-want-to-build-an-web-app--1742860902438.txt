@@ -1,0 +1,155 @@
+
+
+Project Meridian
+Mar 23, 2025
+Prompt for building the score my car app
+I want to build an web app where it supports 4 personas: 
+Reviewers who go through a predefined list of CUJs and Tasks to evaluate the functionality, usability, visual, performance. 
+Internal stakeholders who want to see a high level report of the evaluation and key areas of issues. 
+External stakeholders who should see a limited set of information
+In addition, I’d like to have an admin profile that allows the administrator to make changes to certain configurations without having to change any code. 
+A couple of concepts and terminologies. 
+CUJs - Critical user journey is the common language that we use to review the cars. It can exist in 3 different levels. CUJ Category, CUJs, and Tasks, which holds a 1:m:m relationship. The app should pull the last master of this data from a given source.  
+Evaluation Rubrics
+1. Usability & Interaction Design:
+This category focuses on how easy and intuitive it is for users to interact with the IVI system and/or a specific category (ex: Google Maps).
+Key Considerations in these Definitions:
+Ease of Use: This covers how simple the UI is to operate.
+Intuitiveness: This refers to how natural and predictable the system's behavior is.
+Task Completion: This addresses how well users can achieve their goals (e.g., navigating, playing music, making calls).
+Clarity and Understanding: This focuses on how well users comprehend the system's functions and feedback.
+Usability & Interaction Scoring (Task/Category-Specific)
+Instructions: Rate the following statements based on your experience with the [Specific Task/Category - e.g., Setting up a Navigation Destination, Playing a Podcast, Making a Phone Call] within the IVI.
+Very difficult: I frequently struggled to complete it.
+Somewhat difficult: I encountered some challenges and it wasn't always intuitive.
+Generally easy: I could usually complete it without much difficulty.
+Very easy: I could easily understand and operate it.
+2. Visual Design:
+This category assesses the overall aesthetic appeal and effectiveness of the IVI system's visual elements.
+Key Considerations in these Definitions:
+Aesthetics: This covers how visually pleasing and attractive the design is.
+Clarity: This refers to how clear and easy to understand the visual elements are.
+Effectiveness: This addresses how well the visual design supports the user's tasks and goals.
+Consistency: This focuses on how well the visual design elements are used consistently throughout the interface.
+Visual Scoring (Element/Category-Specific)
+Instructions: Please rate the following statements based on your perception of the visual design of the [Specific Element/Category - e.g., Overall Interface Appearance, Use of Color, Typography, Iconography] within the IVI system.
+
+Very poor: It was unattractive, confusing, or ineffective.
+Somewhat poor: It had some issues with aesthetics, clarity, or consistency.
+Good: It was reasonably attractive, clear, and consistent.
+Excellent: It was highly attractive, clear, and effective.
+3. System Feedback & Responsiveness:
+This category evaluates the system's performance and responsiveness. Consider the smoothness of animations, and the clarity of feedback.Consider whether the system provides clear indications of progress, responds quickly to user input, and avoids delays or lag.
+Key Considerations in these Definitions:
+Responsiveness: This covers how quickly the system reacts to user input.
+Smoothness: This refers to the absence of lag, stuttering, or jerky animations.
+Clarity of Feedback: This addresses how clearly the system communicates the result of a user action.
+Delays and Lag: This focuses on the presence or absence of noticeable delays in system response.
+Feedback & Responsiveness Scoring (Element/Category-Specific)
+Instructions: Please rate the following statements based on your experience with the system's feedback and responsiveness when interacting with the [Specific Element/Category - e.g., Touchscreen Interactions, Voice Command Responses, Navigation Updates, Media Playback Control] within the IVI system.
+
+Very poor: It felt slow, laggy, and unclear.
+Somewhat poor: There were noticeable delays, lag, or unclear feedback.
+Good: It felt reasonably responsive with clear feedback.
+Excellent: It felt very smooth, responsive, and provided clear, immediate feedback.
+
+4. Readability (where applicable):
+
+This category is about how clear, consistent, and error-free the text reads in the IVI system is. Our goal is to make sure users understand what's happening and what to do next. When reading through any text on the screen, it’s important to keep in mind the context of the driver - are they driving or parked? 
+Key Considerations in these Definitions:
+Clarity: How easy is the text to read and understand.
+Consistency: Is the language and terminology consistent with the Google ecosystem? 
+Conciseness: How brief, scannable and to-the-point the text is to read
+Accuracy: How feature correct the info is and are there any errors (e.g., misspellings, grammatical errors).
+Writing Scoring (Element/Category-Specific)
+Instructions: Please rate the following statements based on the quality of the text and language used within the [Specific Element/Category - e.g., On-Screen Messages, Navigation Instructions, Voice Command Prompts, Help/Tutorials] of the IVI system
+
+Very poor: It was confusing, inaccurate, inconsistent, or contained errors.
+Somewhat poor: It had some issues with clarity, consistency, conciseness, or accuracy.
+Reasonably clear: It was reasonably clear, consistent, concise, and accurate.
+Excellent: It was very clear, consistent, concise, and accurate.
+5. Emotional Engagement (bonus points):
+
+This category considers the emotional connection that users have with the IVI system. 
+
+Rate the overall feeling that the system evokes, including its personality, its ability to delight users, and its ability to create a sense of trust. Consider whether the system feels friendly, helpful, and enjoyable to use.
+
+Important Note: These are bonus points. Negative feedback is valuable and will be used for constructive purposes, but it will not decrease the overall score.
+Key Considerations in these Definitions:
+Positive Emotions: This covers feelings like enjoyment, satisfaction, delight, excitement, and connection.
+Negative Emotions: This addresses feelings like frustration, annoyance, and impersonalization.
+Emotional Neutrality: This acknowledges the absence of strong feelings.
+Subjectivity: Emphasize that responses are based on personal feelings and perceptions.
+Emotional Engagement Scoring (Element/Category-Specific)
+Negative: It felt frustrating, impersonal, or unpleasant.
+Neutral: It didn't evoke strong feelings, positive or negative.
+Positive: It felt enjoyable, satisfying, or engaging.
+Strongly positive: It felt delightful, exciting, or created a sense of connection.
+
+
+Requirements
+Master Data
+We have the concept of CUJ categories, CUJs, and Tasks, which holds a 1:m:m relationship. The app should pull the last master of this data from a given source. 
+The Reviewer’s journey
+As the reviewer, I should see a list of open review requests in my queue / inbox. When I click on them, I should see the car information including make, model, year, android version, build fingerprint, location of the car, and the time window that I have to review the CUJs (at all level). The reviewer will likely use a tablet or mobile phone instead of PC. 
+As the reviewer, I should see a list of tasks from different CUJs and categories that I need to complete and provide my evaluation. 
+At Task Level - I want to see the tasks that I need to perform, the prerequisite,  and the expected outcome. I should answer the following question: 
+Doable (Yes or No). 
+Rate the Usability & Interaction Scaled between 1-4  (See Evaluation Rubrics)
+Visuals. Scaled between 1-4(Evaluation Rubrics)
+As a reviewer I should be able to capture up to 5 images and/or videos per tasks level evaluation. 
+
+At CUJ Category Level - I want to provide my feedback at a much higher level so the scores for the entire CUJ category. 
+System Feedback & Responsiveness. 15% of overall score. Scaled between 1-4  (See Evaluation Rubrics)
+Writing 5 % of overall score. Scaled between 1-4  (See Evaluation Rubrics)
+Emotional 5% overall score. Scaled between 1-4 Bonus  (See Evaluation Rubrics)
+As a reviewer I should be able to capture up to 5 images and/or videos per CUJ category level evaluation. The experience should be seamless so that the user can just open up the camera app from this app and capture and attach photos and videos directly without having to do any work afterwards. 
+
+The viewer’s journey
+
+As a reviewer I want to see a 2-3 page executive-level report. With ability to drill down to the specifics with regard to each CUJ category, CUJ and tasks/.
+"The report should include the following sections: 	
+A photo of the car and its overall score (please go online and find it)
+Basic info for the car - android version, build fingerprint
+Key takeaways from reviewer - provide manually by reviewer
+Key takeaways: This IVI is {outstanding, good, ok, bad}, I would rank it {#} in our GAS fleet and it is {better, worse} than our {benchmark}. 
+The thing I liked the most is
+The thing I hated the most is
+Top three issues
+Per CUJ Category Scores
+Link to more details
+"Use a consistent format with clear headings, bullet points, and visuals." 
+
+
+The admin’s journey 
+As the administrator of the this app, I should expect that the CUJs data (category, CUJ, tasks) are all up to date from the master.
+As the administrator, I should be able to configure the app with the following parameters: 
+
+
+At Task Level - a score for the tasks
+
+
+Doable (Yes or No). Yes = 43.75%/43.75% of task score, No = 0%/43.75% of task score
+Usability & Interaction. 37.5% of overall score. Scaled between 1-4
+Visuals. 18.75% of overall score. Scaled between 1-4
+
+
+
+
+At CUJ Category Level - a score for the CUJ Categories
+
+
+Average of all the task scores  in that category 80% of overall score
+System Feedback & Responsiveness. 15% of overall score. Scaled between 1-4
+Writing 5 % of overall score. Scaled between 1-4
+Emotional 5% overall score. Scaled between 1-4 Bonus
+
+
+The app should have an interface for the admin to make these adjustments, while also have some sort of weight in indicating the scoring dictionary used during a particular review. 
+
+ 
+
+
+
+
+
