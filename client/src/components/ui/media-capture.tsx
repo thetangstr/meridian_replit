@@ -393,9 +393,14 @@ export function MediaCapture({
           // Set up data handling for future recording
           // Only request data when the recording is stopped, not continuously
           mediaRecorder.ondataavailable = (event) => {
+            console.log(`Data available: ${event.data?.size || 0} bytes, type: ${event.data?.type || 'unknown'}`);
+            
             if (event.data && event.data.size > 0) {
-              console.log(`Data available: ${event.data.size} bytes`);
               recordedChunksRef.current.push(event.data);
+              console.log(`Added data chunk, total chunks: ${recordedChunksRef.current.length}, total data: ${
+                recordedChunksRef.current.reduce((sum, chunk) => sum + chunk.size, 0)} bytes`);
+            } else {
+              console.log("WARNING: Received empty data chunk");
             }
           };
           
@@ -617,18 +622,14 @@ export function MediaCapture({
         // Make sure recorded chunks are empty before starting a new recording
         recordedChunksRef.current = [];
         
-        // Start recording WITHOUT a timeslice parameter, but explicitly request data
-        // on stop
-        mediaRecorderRef.current.start();
+        // Start recording WITH a timeslice parameter (100ms) to collect data during recording
+        // This ensures we get data chunks regularly throughout the recording
+        // rather than only at the end
+        mediaRecorderRef.current.start(100); // Collect data every 100ms
         
-        // Explicitly request data when recording stops
-        mediaRecorderRef.current.addEventListener('stop', () => {
-          console.log("Adding stop event listener to explicitly request data");
-          // This ensures data is available even if the browser doesn't automatically trigger it
-          if (mediaRecorderRef.current && typeof mediaRecorderRef.current.requestData === 'function') {
-            mediaRecorderRef.current.requestData();
-          }
-        });
+        // Explicitly request data just BEFORE recording stops, not AFTER
+        // This ensures we have data available when the stop event triggers
+        // We're not using the 'stop' event listener because the recorder would already be inactive
         
         // Update UI state
         setIsRecording(true);
