@@ -994,9 +994,14 @@ export function MediaCapture({
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'video') => {
+    e.preventDefault(); // Prevent default form submission behavior
+    e.stopPropagation(); // Stop event propagation to prevent navigation
+    
     const files = e.target.files;
     if (!files?.length) return;
 
+    console.log(`File selected: ${files.length} ${type} files`);
+    
     try {
       setIsLoading(true);
       
@@ -1014,6 +1019,7 @@ export function MediaCapture({
       
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
+        console.log(`Processing file ${i+1}: ${file.name}, size: ${file.size}, type: ${file.type}`);
         
         // Create a temporary object URL for immediate display
         const tempObjectUrl = URL.createObjectURL(file);
@@ -1027,12 +1033,14 @@ export function MediaCapture({
         
         // Add temporary item to show immediate feedback
         newItems.push(tempItem);
+        console.log('Added temporary media item:', tempItem.id);
         
         // Prepare form data for upload
         const formData = new FormData();
         formData.append('file', file);
         
         try {
+          console.log(`Uploading ${type} to server...`);
           // Upload the file to the server
           const response = await fetch('/api/media/upload', {
             method: 'POST',
@@ -1045,6 +1053,7 @@ export function MediaCapture({
           
           // Get the permanent media item from the server response
           const mediaItem: MediaItem = await response.json();
+          console.log('Received permanent media from server:', mediaItem);
           
           // Replace the temporary item with the permanent one
           const itemIndex = newItems.findIndex(item => item.id === tempItem.id);
@@ -1057,6 +1066,7 @@ export function MediaCapture({
             
             // Replace with permanent item
             newItems[itemIndex] = mediaItem;
+            console.log('Replaced temporary item with permanent item');
           }
         } catch (uploadError) {
           console.error('File upload error:', uploadError);
@@ -1069,7 +1079,12 @@ export function MediaCapture({
       }
       
       // Update media state with new items
+      console.log('Updating media with new items:', newItems.length);
       onChange([...media, ...newItems]);
+      toast({
+        title: `${type === 'image' ? 'Image' : 'Video'} uploaded`,
+        description: "Your media has been added successfully."
+      });
       
       // Reset the file input
       if (type === 'image' && fileInputRef.current) {
@@ -1078,6 +1093,7 @@ export function MediaCapture({
         videoInputRef.current.value = '';
       }
     } catch (error) {
+      console.error('Error in handleFileChange:', error);
       toast({
         title: "Failed to process media",
         description: error instanceof Error ? error.message : "An unexpected error occurred",
@@ -1154,7 +1170,12 @@ export function MediaCapture({
         type="file" 
         ref={fileInputRef}
         accept="image/*"
-        onChange={(e) => handleFileChange(e, 'image')}
+        onChange={(e) => {
+          e.stopPropagation();
+          handleFileChange(e, 'image');
+          return false;
+        }}
+        onClick={(e) => e.stopPropagation()}
         style={{ display: 'none' }}
         multiple
       />
@@ -1162,7 +1183,12 @@ export function MediaCapture({
         type="file" 
         ref={videoInputRef}
         accept="video/*"
-        onChange={(e) => handleFileChange(e, 'video')}
+        onChange={(e) => {
+          e.stopPropagation();
+          handleFileChange(e, 'video');
+          return false;
+        }}
+        onClick={(e) => e.stopPropagation()}
         style={{ display: 'none' }}
         multiple
       />
@@ -1301,7 +1327,13 @@ export function MediaCapture({
             variant="outline"
             size="lg"
             className="flex flex-col items-center justify-center h-24 py-2"
-            onClick={() => fileInputRef.current?.click()}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (fileInputRef.current) {
+                fileInputRef.current.click();
+              }
+            }}
             disabled={isLoading || media.length >= maxItems}
           >
             <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-1">
@@ -1314,7 +1346,13 @@ export function MediaCapture({
             variant="outline"
             size="lg"
             className="flex flex-col items-center justify-center h-24 py-2"
-            onClick={() => videoInputRef.current?.click()}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (videoInputRef.current) {
+                videoInputRef.current.click();
+              }
+            }}
             disabled={isLoading || media.length >= maxItems}
           >
             <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-1">
