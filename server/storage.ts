@@ -75,6 +75,7 @@ export interface IStorage {
   getReviewsByReviewer(reviewerId: number): Promise<ReviewWithDetails[]>;
   createReview(review: InsertReview): Promise<Review>;
   updateReviewStatus(id: number, status: string): Promise<Review>;
+  updateReview(id: number, lastModifiedById: number, data: { status?: string, isPublished?: boolean }): Promise<Review>;
   
   // Task Evaluation operations
   getTaskEvaluation(reviewId: number, taskId: number): Promise<TaskEvaluation | undefined>;
@@ -791,6 +792,28 @@ export class MemStorage implements IStorage {
     const updatedReview: Review = {
       ...review,
       status,
+      updatedAt: new Date().toISOString()
+    };
+    
+    this.reviews.set(id, updatedReview);
+    return updatedReview;
+  }
+  
+  async updateReview(id: number, lastModifiedById: number, data: { status?: string, isPublished?: boolean }): Promise<Review> {
+    const review = this.reviews.get(id);
+    if (!review) {
+      throw new Error('Review not found');
+    }
+    
+    // Don't allow changes to published reviews unless it's being unpublished
+    if (review.isPublished && data.isPublished !== false) {
+      throw new Error('Cannot modify a published review');
+    }
+    
+    const updatedReview: Review = {
+      ...review,
+      ...data,
+      lastModifiedById,
       updatedAt: new Date().toISOString()
     };
     

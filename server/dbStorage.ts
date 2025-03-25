@@ -193,6 +193,39 @@ export class DbStorage implements IStorage {
     
     return result[0];
   }
+  
+  async updateReview(id: number, lastModifiedById: number, data: { status?: string, isPublished?: boolean }): Promise<Review> {
+    // First check if review exists and if it's published
+    const reviewCheck = await db
+      .select()
+      .from(reviews)
+      .where(eq(reviews.id, id));
+      
+    if (reviewCheck.length === 0) {
+      throw new Error('Review not found');
+    }
+    
+    const review = reviewCheck[0];
+    
+    // Don't allow changes to published reviews unless it's being unpublished
+    if (review.isPublished && data.isPublished !== false) {
+      throw new Error('Cannot modify a published review');
+    }
+    
+    const updateData: any = {
+      ...data,
+      lastModifiedById,
+      updatedAt: new Date()
+    };
+    
+    const result = await db
+      .update(reviews)
+      .set(updateData)
+      .where(eq(reviews.id, id))
+      .returning();
+    
+    return result[0];
+  }
 
   // Task Evaluation operations
   async getTaskEvaluation(reviewId: number, taskId: number): Promise<TaskEvaluation | undefined> {
