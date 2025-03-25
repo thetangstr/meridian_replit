@@ -120,7 +120,10 @@ export default function ReviewDetail() {
   // Update review status mutation
   const updateReviewStatus = useMutation({
     mutationFn: async (status: string) => {
-      return await apiRequest('PATCH', `/api/reviews/${reviewId}`, { status });
+      return await apiRequest(`/api/reviews/${reviewId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status })
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/reviews/${reviewId}`] });

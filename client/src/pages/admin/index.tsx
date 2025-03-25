@@ -132,7 +132,10 @@ export default function AdminDashboard() {
   // Update category weights
   const updateCategoryWeights = useMutation({
     mutationFn: async (weights: typeof categoryLevelWeights) => {
-      return await apiRequest('PATCH', '/api/admin/scoring-config/category', weights);
+      return await apiRequest('/api/admin/scoring-config/category', {
+        method: 'PATCH',
+        body: JSON.stringify(weights)
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/scoring-config'] });
