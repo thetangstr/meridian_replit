@@ -136,22 +136,28 @@ export function MediaCapture({
         return;
       }
       
-      // Setup video recording
+      // Setup video recording - use lower resolution to reduce crashes
       const constraints = {
         video: {
           facingMode,
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
+          width: { ideal: 640 },  // Lower resolution
+          height: { ideal: 480 }, // Lower resolution
+          frameRate: { ideal: 15 } // Lower framerate
         },
         audio: true
       };
+      
+      // First stop any existing streams
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach(track => track.stop());
+      }
       
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       mediaStreamRef.current = stream;
       
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        videoRef.current.play().catch(err => {
+        await videoRef.current.play().catch(err => {
           console.error("Error playing video:", err);
         });
       }
@@ -161,9 +167,20 @@ export function MediaCapture({
       
       // Check if MediaRecorder is supported
       if ('MediaRecorder' in window) {
-        const mediaRecorder = new MediaRecorder(stream, {
-          mimeType: 'video/webm;codecs=vp9,opus',
-        });
+        // Try to use a more widely supported codec
+        let options = {};
+        try {
+          if (MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')) {
+            options = { mimeType: 'video/webm;codecs=vp8,opus' };
+          } else if (MediaRecorder.isTypeSupported('video/webm')) {
+            options = { mimeType: 'video/webm' };
+          }
+        } catch (e) {
+          console.log('Codec detection error:', e);
+          // Use default codec
+        }
+        
+        const mediaRecorder = new MediaRecorder(stream, options);
         
         mediaRecorderRef.current = mediaRecorder;
         
@@ -735,6 +752,13 @@ export function MediaCapture({
                     src={item.url} 
                     alt={`Captured ${index + 1}`} 
                     className="w-full aspect-square object-cover rounded-md"
+                    onError={(e) => {
+                      // Retry loading with full URL if relative path fails
+                      const imgElement = e.currentTarget;
+                      if (!imgElement.src.startsWith('http') && !imgElement.src.startsWith('blob:') && !imgElement.src.startsWith('data:')) {
+                        imgElement.src = window.location.origin + imgElement.src;
+                      }
+                    }}
                   />
                 ) : (
                   <div className="relative bg-black rounded-md aspect-video flex items-center justify-center">
@@ -742,6 +766,14 @@ export function MediaCapture({
                       src={item.url} 
                       className="w-full h-full object-contain"
                       controls
+                      poster={item.thumbnailUrl || undefined}
+                      onError={(e) => {
+                        // Retry loading with full URL if relative path fails
+                        const videoElement = e.currentTarget;
+                        if (!videoElement.src.startsWith('http') && !videoElement.src.startsWith('blob:') && !videoElement.src.startsWith('data:')) {
+                          videoElement.src = window.location.origin + videoElement.src;
+                        }
+                      }}
                     />
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                       <Video className="h-8 w-8 text-white opacity-50" />

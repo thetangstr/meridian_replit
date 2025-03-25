@@ -804,8 +804,9 @@ export class MemStorage implements IStorage {
     userId: number;
   }): Promise<MediaItem> {
     const id = `media-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-    const baseUrl = process.env.BASE_URL || `http://localhost:5000`;
-    const url = `${baseUrl}/uploads/${file.filename}`;
+    
+    // Use relative paths which are more reliable across different environments
+    const url = `/uploads/${file.filename}`;
     
     // Create thumbnail URL for images (in a real implementation, this would generate a thumbnail)
     const thumbnailUrl = file.type === 'image' ? url : undefined;
@@ -833,9 +834,17 @@ export class MemStorage implements IStorage {
     }
     
     try {
-      // Extract the filename from the URL
-      const urlPath = new URL(item.url).pathname;
-      const filename = urlPath.split('/').pop();
+      // Extract the filename from the URL (handle both absolute and relative URLs)
+      let filename: string | undefined;
+      
+      if (item.url.startsWith('http')) {
+        // For absolute URLs
+        const urlPath = new URL(item.url).pathname;
+        filename = urlPath.split('/').pop();
+      } else {
+        // For relative URLs like "/uploads/filename.jpg"
+        filename = item.url.split('/').pop();
+      }
       
       if (filename) {
         // Construct the path to the file
