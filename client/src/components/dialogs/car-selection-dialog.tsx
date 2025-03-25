@@ -57,7 +57,7 @@ export function CarSelectionDialog({
   // Create new car mutation
   const createCarMutation = useMutation({
     mutationFn: async (car: typeof newCar) => {
-      return apiRequest("/api/cars", {
+      return apiRequest<Car>("/api/cars", {
         method: "POST",
         body: JSON.stringify(car),
       });

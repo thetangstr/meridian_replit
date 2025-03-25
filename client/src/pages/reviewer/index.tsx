@@ -30,7 +30,7 @@ export default function ReviewerDashboard() {
       const endDate = new Date(today);
       endDate.setDate(today.getDate() + 14); // Set due date 2 weeks from now
       
-      return apiRequest('/api/reviews', {
+      return apiRequest<Review>('/api/reviews', {
         method: 'POST',
         body: JSON.stringify({
           carId: data.carId,
@@ -176,13 +176,21 @@ export default function ReviewerDashboard() {
             
             // Check if review is past due date
             const isPastDue = new Date(review.endDate) < new Date() && review.status !== 'completed';
+            const isPublished = review.isPublished;
             
             return (
               <Card 
                 key={review.id} 
-                className={`border ${isPastDue ? 'border-red-300' : 'border-gray-200'}`}
+                className={`border ${isPastDue ? 'border-red-300' : isPublished ? 'border-green-300' : 'border-gray-200'} 
+                           ${isPublished ? 'bg-green-50' : ''}`}
               >
-                <CardContent className="p-4">
+                <CardContent className="p-4 relative">
+                  {isPublished && (
+                    <div className="absolute top-2 right-2 text-green-600 flex items-center gap-1">
+                      <Info className="h-4 w-4" />
+                      <span className="text-xs">Published</span>
+                    </div>
+                  )}
                   <div className="flex justify-between items-start">
                     <div>
                       <h3 className="text-lg font-medium">
@@ -193,7 +201,7 @@ export default function ReviewerDashboard() {
                         <p>Location: {review.car.location}</p>
                       </div>
                     </div>
-                    <div className={`${bgColor} ${textColor} px-3 py-1 rounded-full text-sm`}>
+                    <div className={`${bgColor} ${textColor} px-3 py-1 rounded-full text-sm mt-6`}>
                       {text}
                     </div>
                   </div>
@@ -212,8 +220,10 @@ export default function ReviewerDashboard() {
                     </div>
                     <Button
                       onClick={() => handleStartReview(review.id)}
+                      disabled={isPublished}
+                      title={isPublished ? "This review is published and cannot be modified" : ""}
                     >
-                      {buttonText}
+                      {isPublished ? "View" : buttonText}
                     </Button>
                   </div>
                 </CardContent>
