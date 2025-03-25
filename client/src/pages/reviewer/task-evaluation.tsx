@@ -11,7 +11,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { apiRequest } from "@/lib/queryClient";
-import { Task as BaseTask, TaskEvaluation, scoringScaleDescriptions } from "@shared/schema";
+import { Task as BaseTask, TaskEvaluation as BaseTaskEvaluation, scoringScaleDescriptions } from "@shared/schema";
 import { MediaCapture } from "@/components/ui/media-capture";
 import { useToast } from "@/hooks/use-toast";
 import { CSSTransition, TransitionGroup } from "react-transition-group";
@@ -28,11 +28,21 @@ type Task = BaseTask & {
   }
 };
 
+// Extend the TaskEvaluation to include our new fields
+type TaskEvaluation = BaseTaskEvaluation & {
+  undoableReason?: string;
+  usabilityFeedback?: string;
+  visualsFeedback?: string;
+};
+
 // Form validation schema
 const taskEvaluationSchema = z.object({
   doable: z.boolean(),
+  undoableReason: z.string().optional(),
   usabilityScore: z.number().min(1).max(4),
+  usabilityFeedback: z.string().optional(),
   visualsScore: z.number().min(1).max(4),
+  visualsFeedback: z.string().optional(),
   media: z.any().optional(),
 });
 
@@ -85,11 +95,19 @@ export default function TaskEvaluationPage() {
     resolver: zodResolver(taskEvaluationSchema),
     defaultValues: {
       doable: evaluation?.doable ?? true,
+      undoableReason: evaluation?.undoableReason ?? '',
       usabilityScore: evaluation?.usabilityScore ?? undefined,
+      usabilityFeedback: evaluation?.usabilityFeedback ?? '',
       visualsScore: evaluation?.visualsScore ?? undefined,
+      visualsFeedback: evaluation?.visualsFeedback ?? '',
       media: evaluation?.media ?? [],
     },
   });
+  
+  // Watch form values to show/hide conditional fields
+  const watchDoable = form.watch("doable");
+  const watchUsabilityScore = form.watch("usabilityScore");
+  const watchVisualsScore = form.watch("visualsScore");
   
   // Find the next task in the same category
   const findNextTask = () => {
@@ -371,6 +389,34 @@ export default function TaskEvaluationPage() {
                         </FormItem>
                       )}
                     />
+                    
+                    {/* Conditional feedback field for non-doable tasks */}
+                    {!watchDoable && (
+                      <div className="mt-4 border-t pt-4 border-gray-100">
+                        <FormField
+                          control={form.control}
+                          name="undoableReason"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>
+                                <div className="text-sm font-medium text-destructive">How come this task wasn't doable?</div>
+                                <div className="text-xs text-muted-foreground mt-1">
+                                  Please explain why the task couldn't be completed and provide evidence below
+                                </div>
+                              </FormLabel>
+                              <FormControl>
+                                <textarea 
+                                  className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                  placeholder="Explain what went wrong..."
+                                  {...field}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
                 
@@ -426,6 +472,34 @@ export default function TaskEvaluationPage() {
                         </FormItem>
                       )}
                     />
+                    
+                    {/* Conditional feedback field for low usability scores */}
+                    {watchDoable && watchUsabilityScore !== undefined && watchUsabilityScore <= 2 && (
+                      <div className="mt-4 border-t pt-4 border-gray-100">
+                        <FormField
+                          control={form.control}
+                          name="usabilityFeedback"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>
+                                <div className="text-sm font-medium text-amber-700">What made this difficult to use?</div>
+                                <div className="text-xs text-muted-foreground mt-1">
+                                  Please explain the issues with usability and provide evidence below
+                                </div>
+                              </FormLabel>
+                              <FormControl>
+                                <textarea 
+                                  className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                  placeholder="Describe the usability issues..."
+                                  {...field}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
                 
@@ -481,6 +555,34 @@ export default function TaskEvaluationPage() {
                         </FormItem>
                       )}
                     />
+                    
+                    {/* Conditional feedback field for low visuals scores */}
+                    {watchDoable && watchVisualsScore !== undefined && watchVisualsScore <= 2 && (
+                      <div className="mt-4 border-t pt-4 border-gray-100">
+                        <FormField
+                          control={form.control}
+                          name="visualsFeedback"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>
+                                <div className="text-sm font-medium text-amber-700">What visual issues did you notice?</div>
+                                <div className="text-xs text-muted-foreground mt-1">
+                                  Please explain the problems with the visual design and provide evidence below
+                                </div>
+                              </FormLabel>
+                              <FormControl>
+                                <textarea 
+                                  className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                  placeholder="Describe the visual issues..."
+                                  {...field}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
                 
