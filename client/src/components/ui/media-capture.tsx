@@ -56,6 +56,7 @@ export function MediaCapture({
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [cameraSupported, setCameraSupported] = useState(true);
+  const [uploadType, setUploadType] = useState<'image' | 'video'>('image');
   
   // Ref for recording timer interval
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);

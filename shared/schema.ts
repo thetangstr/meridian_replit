@@ -110,8 +110,11 @@ export const taskEvaluations = pgTable("task_evaluations", {
   reviewId: integer("review_id").notNull().references(() => reviews.id),
   taskId: integer("task_id").notNull().references(() => tasks.id),
   doable: boolean("doable"),
+  undoableReason: text("undoable_reason"),
   usabilityScore: integer("usability_score"), // 1-4
+  usabilityFeedback: text("usability_feedback"),
   visualsScore: integer("visuals_score"), // 1-4
+  visualsFeedback: text("visuals_feedback"),
   media: json("media").default([]), // Array of image/video URLs
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -121,8 +124,11 @@ export const insertTaskEvaluationSchema = createInsertSchema(taskEvaluations).pi
   reviewId: true,
   taskId: true,
   doable: true,
+  undoableReason: true,
   usabilityScore: true,
+  usabilityFeedback: true,
   visualsScore: true,
+  visualsFeedback: true,
   media: true,
 });
 
