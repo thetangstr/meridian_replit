@@ -234,7 +234,11 @@ export function MediaCapture({
         // Handle recording stop event
         mediaRecorder.onstop = () => {
           console.log("MediaRecorder stopped, processing video");
-          processVideoRecording();
+          processVideoRecording().catch(error => {
+            console.error("Error in video processing:", error);
+            // Don't close the camera UI on error
+            setIsRecording(false);
+          });
         };
         
         mediaRecorder.onerror = (err) => {
@@ -260,13 +264,8 @@ export function MediaCapture({
           variant: "destructive"
         });
         
-        // Fallback to file upload instead
-        if (videoInputRef.current) {
-          videoInputRef.current.click();
-        }
-        
-        // Reset mode
-        setCameraMode(null);
+        // Stay in camera mode but show an error
+        setIsLoading(false);
       }
     } catch (error) {
       console.error("Video recording setup error:", error);
@@ -276,13 +275,8 @@ export function MediaCapture({
         variant: "destructive"
       });
       
-      // Fallback to file input
-      if (videoInputRef.current) {
-        videoInputRef.current.click();
-      }
-      
-      // Reset camera mode
-      setCameraMode(null);
+      // Stay in camera mode but show an error
+      setIsLoading(false);
     }
   };
 
@@ -397,8 +391,9 @@ export function MediaCapture({
           onChange([...media, mediaItem]);
         }
         
-        // Now we can safely stop the camera
-        stopCamera();
+        // Reset camera mode instead of stopping camera completely
+        // This allows the user to stay in the camera view
+        setCameraMode(null);
       } catch (uploadError) {
         console.error("Video upload error:", uploadError);
         toast({
@@ -414,7 +409,7 @@ export function MediaCapture({
         // Revoke the URL
         revokeSafeObjectURL(tempItem.url);
         
-        // Don't stop camera on error - let user try again
+        // Don't stop camera on error - just reset the recording state
         setIsRecording(false);
       }
     } catch (error) {
@@ -425,7 +420,7 @@ export function MediaCapture({
         variant: "destructive"
       });
       
-      // Don't stop camera on error - let user try again
+      // Don't stop camera on error - just reset the recording state
       setIsRecording(false);
     } finally {
       // Reset recorder state
