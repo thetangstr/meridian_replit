@@ -396,7 +396,18 @@ export default function ReviewDetail() {
         <CardContent className="p-4">
           <div className="flex justify-between items-center mb-2">
             <h3 className="font-medium">Review Progress</h3>
-            <span className="text-sm text-muted-foreground">{totalCompleted}/{totalTasks} tasks completed</span>
+            <div className="flex items-center gap-2">
+              {totalCompleted === totalTasks && totalTasks > 0 ? (
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                  <svg className="mr-1 h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  All Tasks Complete
+                </span>
+              ) : (
+                <span className="text-sm text-muted-foreground">{totalCompleted}/{totalTasks} tasks completed</span>
+              )}
+            </div>
           </div>
           <Progress value={progressPercentage} className="h-2.5" />
           <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-4">
