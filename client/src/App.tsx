@@ -12,6 +12,7 @@ import TaskEvaluation from "@/pages/reviewer/task-evaluation";
 import CategoryEvaluation from "@/pages/reviewer/category-evaluation";
 import ReportView from "@/pages/reports/report";
 import AdminDashboard from "@/pages/admin";
+import MediaTestPage from "@/pages/media-test";
 import AuthenticatedLayout from "@/components/layout/authenticated-layout";
 
 function PrivateRoute({ component: Component, roles, ...rest }: any) {
@@ -115,6 +116,11 @@ function Router() {
             {/* Report routes - available to all authenticated users */}
             <Route path="/reports/:id" component={(props) => 
               <PrivateRoute component={ReportView} {...props} />
+            } />
+            
+            {/* Media Test route */}
+            <Route path="/media-test" component={(props) => 
+              <PrivateRoute component={MediaTestPage} {...props} />
             } />
             
             {/* Admin routes */}
