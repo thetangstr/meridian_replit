@@ -7,6 +7,29 @@
     <title>Score My Car - Evaluation Platform</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <script>
+      // Redirect to login if not on login page
+      if (window.location.pathname !== '/login') {
+        // Check if cookie shows previous authentication attempt
+        if (!document.cookie.includes('auth_checked=true')) {
+          // Set cookie to prevent redirect loop
+          document.cookie = 'auth_checked=true; path=/;';
+          
+          // Check if session is active
+          fetch('/api/auth/me', {
+            credentials: 'include',
+          }).then(response => {
+            if (response.status === 401) {
+              // If not authenticated, go to login
+              window.location.href = '/login';
+            }
+          }).catch(() => {
+            // If error, go to login
+            window.location.href = '/login';
+          });
+        }
+      }
+    </script>
     <style>
       :root {
         --score-poor: #ea4335;

@@ -48,12 +48,42 @@ function AuthRoute({ component: Component, ...rest }: any) {
 }
 
 function Router() {
-  const [location] = useLocation();
-  const { checkAuth } = useAuth();
+  const [location, setLocation] = useLocation();
+  const { checkAuth, isAuthenticated, loading } = useAuth();
   
   useEffect(() => {
-    checkAuth();
-  }, [checkAuth]);
+    const initAuth = async () => {
+      await checkAuth();
+      
+      // After checking auth, redirect to login if not authenticated
+      if (!isAuthenticated && location !== '/login') {
+        console.log('Not authenticated, redirecting to login');
+        setLocation('/login');
+      }
+    };
+    
+    initAuth();
+  }, [checkAuth, isAuthenticated, location, setLocation]);
+  
+  // Force redirect to login during initial load
+  useEffect(() => {
+    if (loading === false && !isAuthenticated && location !== '/login') {
+      console.log('Not authenticated (after load), redirecting to login');
+      setLocation('/login');
+    }
+  }, [loading, isAuthenticated, location, setLocation]);
+  
+  // If not authenticated and not on login page, show a temporary loading state
+  if (!isAuthenticated && location !== '/login') {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mx-auto mb-4"></div>
+          <div>Redirecting to login...</div>
+        </div>
+      </div>
+    );
+  }
   
   return (
     <Switch>
@@ -92,6 +122,21 @@ function Router() {
 function App() {
   // Add basic error handling
   try {
+    // Get current pathname
+    const pathname = window.location.pathname;
+    
+    console.log("Current pathname:", pathname);
+    
+    // Skip AuthenticatedLayout for login page
+    if (pathname === "/login") {
+      return (
+        <QueryClientProvider client={queryClient}>
+          <Login />
+          <Toaster />
+        </QueryClientProvider>
+      );
+    }
+    
     return (
       <QueryClientProvider client={queryClient}>
         <AuthenticatedLayout>
