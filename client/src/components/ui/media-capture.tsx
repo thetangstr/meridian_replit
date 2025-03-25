@@ -687,32 +687,65 @@ export function MediaCapture({
     try {
       // Only start if we have a valid recorder and we're not already recording
       if (mediaRecorderRef.current && !isRecording) {
-        console.log(`Starting recording at ${new Date().toISOString()}`);
+        const startTime = new Date().toISOString();
+        console.log(`Starting recording at ${startTime}`);
         console.log("MediaRecorder state before start:", mediaRecorderRef.current.state);
         
         // Clear any previous recordings
         recordedChunksRef.current = [];
         
-        // Start recording with a timeslice parameter that's smaller (250ms)
-        // to ensure we get chunks more frequently
-        mediaRecorderRef.current.start(250);
-        console.log("MediaRecorder state after start:", mediaRecorderRef.current.state);
-        
-        // Update UI state
+        // Set recording flag first to prevent multiple starts
         setIsRecording(true);
         
-        // Add a safety timeout to ensure we get at least one dataavailable event
-        // if the recorder doesn't trigger it naturally
+        // Add multiple safety measures to ensure we get data
+        
+        // Immediate request for data just in case
+        try {
+          if (typeof mediaRecorderRef.current.requestData === 'function') {
+            setTimeout(() => {
+              if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+                console.log("Requesting initial data point");
+                mediaRecorderRef.current.requestData();
+              }
+            }, 100);
+          }
+        } catch (reqErr) {
+          console.warn("Error requesting initial data:", reqErr);
+        }
+        
+        // Start recording with a very small timeslice parameter (100ms)
+        // to ensure we get chunks more frequently
+        mediaRecorderRef.current.start(100);
+        console.log("MediaRecorder state after start:", mediaRecorderRef.current.state);
+        
+        // Multiple safety timeouts to ensure we get data throughout recording
+        const requestDataIntervals = [250, 500, 1000, 2000];
+        
+        requestDataIntervals.forEach(delay => {
+          setTimeout(() => {
+            if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+              try {
+                console.log(`Explicitly requesting data via timeout after ${delay}ms`);
+                mediaRecorderRef.current.requestData();
+              } catch (err) {
+                console.warn(`Error in safety timeout requestData (${delay}ms):`, err);
+              }
+            }
+          }, delay);
+        });
+        
+        // If we still have no chunks after a few seconds, force getting at least a dummy frame
         setTimeout(() => {
-          if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+          if (recordedChunksRef.current.length === 0 && mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+            console.log("CRITICAL: No chunks collected after 3s - forcing stop and dummy data");
+            // Stop the recorder since it's not working
             try {
-              console.log("Explicitly requesting data via timeout");
-              mediaRecorderRef.current.requestData();
-            } catch (err) {
-              console.warn("Error in safety timeout requestData:", err);
+              mediaRecorderRef.current.stop();
+            } catch (stopErr) {
+              console.warn("Error stopping non-functional recorder:", stopErr);
             }
           }
-        }, 1000);
+        }, 3000);
         
         toast({
           title: "Recording video",
