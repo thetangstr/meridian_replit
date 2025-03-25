@@ -391,6 +391,7 @@ export function MediaCapture({
           mediaRecorderRef.current = mediaRecorder;
           
           // Set up data handling for future recording
+          // Only request data when the recording is stopped, not continuously
           mediaRecorder.ondataavailable = (event) => {
             if (event.data && event.data.size > 0) {
               console.log(`Data available: ${event.data.size} bytes`);
@@ -398,13 +399,19 @@ export function MediaCapture({
             }
           };
           
-          // Handle recording stop event
+          // Handle recording stop event - this is triggered when stop() is called
           mediaRecorder.onstop = () => {
             console.log("MediaRecorder stopped, processing video");
-            processVideoRecording().catch(error => {
-              console.error("Error in video processing:", error);
+            // Only process if we actually have some data and are in recording state
+            if (recordedChunksRef.current.length > 0 && isRecording) {
+              processVideoRecording().catch(error => {
+                console.error("Error in video processing:", error);
+                setIsRecording(false);
+              });
+            } else {
+              console.log("MediaRecorder stopped but no data collected or not in recording state");
               setIsRecording(false);
-            });
+            }
           };
           
           mediaRecorder.onerror = (err) => {
@@ -610,8 +617,20 @@ export function MediaCapture({
         // Make sure recorded chunks are empty before starting a new recording
         recordedChunksRef.current = [];
         
-        // Use a larger timeslice (500ms) to reduce overhead and improve stability
-        mediaRecorderRef.current.start(500);
+        // Start recording WITHOUT a timeslice parameter, but explicitly request data
+        // on stop
+        mediaRecorderRef.current.start();
+        
+        // Explicitly request data when recording stops
+        mediaRecorderRef.current.addEventListener('stop', () => {
+          console.log("Adding stop event listener to explicitly request data");
+          // This ensures data is available even if the browser doesn't automatically trigger it
+          if (mediaRecorderRef.current && typeof mediaRecorderRef.current.requestData === 'function') {
+            mediaRecorderRef.current.requestData();
+          }
+        });
+        
+        // Update UI state
         setIsRecording(true);
         
         toast({
@@ -650,8 +669,19 @@ export function MediaCapture({
       if (mediaRecorderRef.current) {
         console.log("Stopping MediaRecorder");
         try {
-          mediaRecorderRef.current.stop();
-          console.log("MediaRecorder stopped successfully");
+          // First explicitly request the data
+          if (typeof mediaRecorderRef.current.requestData === 'function') {
+            console.log("Explicitly requesting data before stopping");
+            mediaRecorderRef.current.requestData();
+          }
+          
+          // Small delay to ensure the data is processed before stopping
+          setTimeout(() => {
+            if (mediaRecorderRef.current) {
+              mediaRecorderRef.current.stop();
+              console.log("MediaRecorder stopped successfully after data request");
+            }
+          }, 100);
         } catch (stopError) {
           console.error("Error stopping MediaRecorder:", stopError);
           // If stopping fails, immediately clean up everything
