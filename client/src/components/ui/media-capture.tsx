@@ -2,30 +2,9 @@ import { useState, useRef, useEffect } from "react";
 import { Camera } from "react-camera-pro";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Camera as CameraIcon, Video, X, AlertCircle, Upload, RotateCcw } from "lucide-react";
+import { Camera as CameraIcon, Video, X, AlertCircle, Upload, RefreshCw, Circle, Square, RotateCcw } from "lucide-react";
 import { MediaItem } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
-
-// Helper function to safely create an object URL
-const createSafeObjectURL = (data: any): string => {
-  try {
-    return URL.createObjectURL(data);
-  } catch (error) {
-    console.error('Error creating object URL:', error);
-    return '';
-  }
-};
-
-// Helper function to safely revoke an object URL
-const revokeSafeObjectURL = (url: string | undefined): void => {
-  if (url && url.startsWith('blob:')) {
-    try {
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Error revoking object URL:', error);
-    }
-  }
-};
 
 interface MediaCaptureProps {
   media: MediaItem[];
@@ -40,12 +19,6 @@ export function MediaCapture({
   onChange,
   className
 }: MediaCaptureProps) {
-  // Helper function to format seconds into mm:ss format
-  const formatTime = (seconds: number): string => {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
-  };
   const { toast } = useToast();
   const cameraRef = useRef<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -65,6 +38,13 @@ export function MediaCapture({
   const recordedChunksRef = useRef<Blob[]>([]);
   const videoRef = useRef<HTMLVideoElement>(null);
 
+  // Helper function to format seconds into mm:ss format
+  const formatTime = (seconds: number): string => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
+  
   // Check if device has camera
   useEffect(() => {
     const checkCameraSupport = async () => {
@@ -86,34 +66,7 @@ export function MediaCapture({
       }
     };
     
-    // Fix for iOS Safari
-    const fixIOSSafari = () => {
-      // iOS Safari requires a user gesture to enable audio/video
-      // We'll add an event listener for the first click on the document
-      const handleInitialTouch = () => {
-        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-          navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-            .then(stream => {
-              // Immediately stop all tracks - we just needed permission
-              stream.getTracks().forEach(track => track.stop());
-            })
-            .catch(err => {
-              console.warn("Permission request on touch failed:", err);
-            });
-        }
-        
-        // Remove event listener after first touch
-        document.removeEventListener('touchstart', handleInitialTouch);
-        document.removeEventListener('click', handleInitialTouch);
-      };
-      
-      // Add event listeners for both touch and click events
-      document.addEventListener('touchstart', handleInitialTouch, { once: true });
-      document.addEventListener('click', handleInitialTouch, { once: true });
-    };
-    
     checkCameraSupport();
-    fixIOSSafari();
     
     // Cleanup function to ensure we don't leave any cameras on
     return () => {
@@ -121,58 +74,30 @@ export function MediaCapture({
     };
   }, []);
 
+  // Camera Operations
   const switchCameraMode = (mode: 'image' | 'video' | null) => {
-    console.log(`Switching camera mode: ${cameraMode} -> ${mode}`);
-    
     // If we're already in the selected mode, just turn it off
     if (mode === cameraMode) {
-      console.log("Same mode selected, stopping camera");
       stopCamera();
       return;
     }
     
     // If we have an ongoing recording, stop it first
     if (isRecording) {
-      console.log("Stopping active recording before mode switch");
-      try {
-        stopRecording();
-      } catch (error) {
-        console.error("Error stopping recording during mode switch:", error);
-      }
+      stopRecording();
     }
     
     // Release any existing camera resources
-    console.log("Stopping any existing camera");
-    try {
-      // Clean up media resources
-      if (mediaStreamRef.current) {
-        console.log("Stopping media tracks:", mediaStreamRef.current.getTracks().length);
-        mediaStreamRef.current.getTracks().forEach(track => {
-          console.log(`Stopping track: ${track.kind}, enabled: ${track.enabled}, state: ${track.readyState}`);
-          track.stop();
-        });
-        mediaStreamRef.current = null;
-      }
-      
-      // Reset MediaRecorder if it exists
-      if (mediaRecorderRef.current) {
-        console.log("Cleaning up MediaRecorder reference");
-        mediaRecorderRef.current = null;
-      }
-    } catch (cleanupError) {
-      console.error("Error during camera cleanup:", cleanupError);
-    }
+    stopCamera(false); // don't reset cameraMode yet
     
     // If we're turning off the camera, we're done
     if (mode === null) {
-      console.log("Setting camera mode to null");
       setCameraMode(null);
       return;
     }
     
     // If camera isn't supported, use file input instead
     if (!cameraSupported) {
-      console.log("Camera not supported, using file input fallback");
       if (mode === 'image' && fileInputRef.current) {
         fileInputRef.current.click();
       } else if (mode === 'video' && videoInputRef.current) {
@@ -182,19 +107,14 @@ export function MediaCapture({
     }
     
     // Set the new camera mode
-    console.log(`Setting camera mode to: ${mode}`);
     setCameraMode(mode);
     
-    // For video mode, we need to set up the preview but NOT start recording automatically
+    // For video mode, initialize the preview
     if (mode === 'video') {
-      console.log("Initializing video preview only");
-      // Use a try/catch to handle video preview setup errors
       try {
-        // Start video preview but don't record yet
         initializeVideoPreview();
       } catch (error) {
         console.error("Failed to initialize video preview:", error);
-        // Fallback to null mode if video initialization fails
         setCameraMode(null);
         toast({
           title: "Camera error",
@@ -205,96 +125,157 @@ export function MediaCapture({
     }
   };
 
-  const startVideoRecording = async () => {
-    try {
-      // If we already have an ongoing recording, stop it
-      if (isRecording && mediaRecorderRef.current) {
-        mediaRecorderRef.current.stop();
-        return;
-      }
+  const stopCamera = (resetMode = true) => {
+    // Stop recording if it's active
+    if (isRecording) {
+      stopRecording();
+    }
+    
+    // Stop any media streams
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach(track => track.stop());
+      mediaStreamRef.current = null;
+    }
+    
+    // Clear recorder
+    if (mediaRecorderRef.current) {
+      mediaRecorderRef.current = null;
+    }
+    
+    // Reset mode if needed
+    if (resetMode) {
+      setCameraMode(null);
+    }
+  };
+
+  const switchFacingMode = () => {
+    setFacingMode(prevMode => prevMode === 'environment' ? 'user' : 'environment');
+    
+    // For video mode, we need to restart the preview
+    if (cameraMode === 'video' && mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach(track => track.stop());
+      mediaStreamRef.current = null;
       
-      // Use extremely low-resolution settings to ensure stability
+      // Re-initialize the preview
+      initializeVideoPreview();
+    }
+  };
+
+  // Image Operations
+  const captureImage = async () => {
+    if (!cameraRef.current) return;
+    
+    try {
+      setIsLoading(true);
+      const photo = cameraRef.current.takePhoto();
+      await handleCapturedPhoto(photo);
+    } catch (error) {
+      console.error('Error taking photo:', error);
+      toast({
+        variant: "destructive",
+        title: "Failed to capture photo",
+        description: "There was an error while trying to take the photo."
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCapturedPhoto = async (photoDataUrl: string) => {
+    try {
+      // Convert data URL to blob for upload
+      const response = await fetch(photoDataUrl);
+      const blob = await response.blob();
+      
+      // Create a file from the blob
+      const file = new File([blob], `photo_${Date.now()}.jpg`, { type: 'image/jpeg' });
+      
+      // Upload the file
+      await handleFileUpload(file, 'image');
+    } catch (error) {
+      console.error("Error processing captured photo:", error);
+      toast({
+        variant: "destructive",
+        title: "Failed to process photo",
+        description: "There was an error processing the captured photo."
+      });
+    }
+  };
+
+  // Video Operations
+  const initializeVideoPreview = async () => {
+    setIsLoading(true);
+    
+    try {
+      // Use reasonable settings to ensure stability
       const constraints = {
         video: {
           facingMode,
-          width: { ideal: 320 },  // Very low resolution
-          height: { ideal: 240 },  // Very low resolution
-          frameRate: { ideal: 10 }  // Reduced framerate
+          width: { ideal: 640 },
+          height: { ideal: 480 },
+          frameRate: { ideal: 24 }
         },
         audio: true
       };
       
-      // First stop any existing streams
+      // Stop any existing streams
       if (mediaStreamRef.current) {
         mediaStreamRef.current.getTracks().forEach(track => track.stop());
         mediaStreamRef.current = null;
       }
       
-      if (mediaRecorderRef.current) {
-        mediaRecorderRef.current = null;
+      // Start the preview
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      mediaStreamRef.current = stream;
+      
+      // Setup video preview
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        try {
+          await videoRef.current.play();
+        } catch (playErr) {
+          console.error("Error playing video preview:", playErr);
+        }
       }
       
-      // Clear recorded chunks
-      recordedChunksRef.current = [];
-      
-      console.log("Requesting media stream with constraints:", constraints);
-      
-      // Request user media with reduced quality settings for stability
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
-        mediaStreamRef.current = stream;
-        
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          try {
-            await videoRef.current.play();
-          } catch (playErr) {
-            console.error("Error playing video preview:", playErr);
-            // Continue anyway - we might still be able to record
-          }
-        }
-        
-        // Check if MediaRecorder is supported
-        if (!('MediaRecorder' in window)) {
-          throw new Error("MediaRecorder not supported in this browser");
-        }
-        
-        // Try to use the most basic, universally supported codec options
+      // Setup MediaRecorder
+      if ('MediaRecorder' in window) {
+        // Try to use universally supported codecs
         let options = {};
+        const possibleTypes = [
+          'video/webm;codecs=vp9,opus',
+          'video/webm;codecs=vp8,opus', 
+          'video/webm;codecs=h264,opus',
+          'video/mp4;codecs=h264,aac',
+          'video/webm',
+          'video/mp4'
+        ];
         
-        try {
-          // Check support for very basic webm format
-          if (MediaRecorder.isTypeSupported('video/webm')) {
-            options = { mimeType: 'video/webm' };
-            console.log("Using video/webm format");
+        for (const type of possibleTypes) {
+          if (MediaRecorder.isTypeSupported(type)) {
+            options = { mimeType: type };
+            console.log(`Using ${type} format for video recording`);
+            break;
           }
-        } catch (codecErr) {
-          console.warn('Codec detection error:', codecErr);
-          // Continue with default codec options
         }
         
-        console.log("Creating MediaRecorder with options:", options);
-        
-        // Create media recorder with minimal overhead
         const mediaRecorder = new MediaRecorder(stream, options);
         mediaRecorderRef.current = mediaRecorder;
         
-        // Set up data handling
+        // Setup data handling
         mediaRecorder.ondataavailable = (event) => {
           if (event.data && event.data.size > 0) {
-            console.log(`Data available: ${event.data.size} bytes`);
             recordedChunksRef.current.push(event.data);
           }
         };
         
-        // Handle recording stop event
+        // Handle recording stop
         mediaRecorder.onstop = () => {
-          console.log("MediaRecorder stopped, processing video");
-          processVideoRecording().catch(error => {
-            console.error("Error in video processing:", error);
-            // Don't close the camera UI on error
+          if (recordedChunksRef.current.length > 0 && isRecording) {
+            processVideoRecording();
+          } else {
             setIsRecording(false);
-          });
+          }
         };
         
         mediaRecorder.onerror = (err) => {
@@ -306,886 +287,387 @@ export function MediaCapture({
           });
           setIsRecording(false);
         };
-        
-        toast({
-          title: "Camera ready",
-          description: "Tap the red button to start recording.",
-        });
-        
-      } catch (streamErr) {
-        console.error("Error getting media stream:", streamErr);
-        toast({
-          title: "Camera access failed",
-          description: "Could not access your camera. Please check permissions.",
-          variant: "destructive"
-        });
-        
-        // Stay in camera mode but show an error
-        setIsLoading(false);
-      }
-    } catch (error) {
-      console.error("Video recording setup error:", error);
-      toast({
-        title: "Video recording failed",
-        description: "Please check your camera permissions or try another browser.",
-        variant: "destructive"
-      });
-      
-      // Stay in camera mode but show an error
-      setIsLoading(false);
-    }
-  };
-
-  // Initialize video preview without starting recording
-  const initializeVideoPreview = async () => {
-    console.log("Initializing video preview");
-    setIsLoading(true);
-    
-    try {
-      // Use extremely low-resolution settings to ensure stability
-      const constraints = {
-        video: {
-          facingMode,
-          width: { ideal: 320 },  // Very low resolution
-          height: { ideal: 240 },  // Very low resolution
-          frameRate: { ideal: 10 }  // Reduced framerate
-        },
-        audio: true
-      };
-      
-      // First stop any existing streams
-      if (mediaStreamRef.current) {
-        console.log("Stopping existing media tracks before new preview");
-        mediaStreamRef.current.getTracks().forEach(track => track.stop());
-        mediaStreamRef.current = null;
-      }
-      
-      console.log("Requesting media stream for preview");
-      
-      // Start just the preview without recording
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      mediaStreamRef.current = stream;
-      
-      // Set up video preview
-      if (videoRef.current) {
-        console.log("Setting video source");
-        videoRef.current.srcObject = stream;
-        try {
-          await videoRef.current.play();
-          console.log("Video preview started");
-        } catch (playErr) {
-          console.error("Error playing video preview:", playErr);
-        }
-      }
-      
-      // Check if MediaRecorder is supported (for future recording)
-      if (!('MediaRecorder' in window)) {
-        console.warn("MediaRecorder not supported in this browser");
+      } else {
         toast({
           title: "Limited recording support",
           description: "Your browser may not fully support video recording."
-          // No variant specified, will use default
         });
-      } else {
-        // Set up MediaRecorder but don't start it yet
-        try {
-          // Try to use codecs that are more widely supported
-          let options = {};
-          
-          // The order is important - try best quality first, then fallback options
-          const possibleTypes = [
-            'video/webm;codecs=vp9,opus',
-            'video/webm;codecs=vp8,opus', 
-            'video/webm;codecs=h264,opus',
-            'video/mp4;codecs=h264,aac',
-            'video/webm',
-            'video/mp4'
-          ];
-          
-          for (const type of possibleTypes) {
-            if (MediaRecorder.isTypeSupported(type)) {
-              options = { mimeType: type };
-              console.log(`Using ${type} format for video recording - browser confirms support`);
-              break;
-            }
-          }
-          
-          console.log("Creating (but not starting) MediaRecorder");
-          const mediaRecorder = new MediaRecorder(stream, options);
-          mediaRecorderRef.current = mediaRecorder;
-          
-          // Set up data handling for future recording
-          // Only request data when the recording is stopped, not continuously
-          mediaRecorder.ondataavailable = (event) => {
-            console.log(`Data available: ${event.data?.size || 0} bytes, type: ${event.data?.type || 'unknown'}`);
-            
-            if (event.data && event.data.size > 0) {
-              recordedChunksRef.current.push(event.data);
-              console.log(`Added data chunk, total chunks: ${recordedChunksRef.current.length}, total data: ${
-                recordedChunksRef.current.reduce((sum, chunk) => sum + chunk.size, 0)} bytes`);
-            } else {
-              console.log("WARNING: Received empty data chunk");
-            }
-          };
-          
-          // Handle recording stop event - this is triggered when stop() is called
-          mediaRecorder.onstop = () => {
-            console.log("MediaRecorder stopped, processing video");
-            // Only process if we actually have some data and are in recording state
-            if (recordedChunksRef.current.length > 0 && isRecording) {
-              processVideoRecording().catch(error => {
-                console.error("Error in video processing:", error);
-                setIsRecording(false);
-              });
-            } else {
-              console.log("MediaRecorder stopped but no data collected or not in recording state");
-              setIsRecording(false);
-            }
-          };
-          
-          mediaRecorder.onerror = (err) => {
-            console.error("MediaRecorder error:", err);
-            toast({
-              title: "Recording error",
-              description: "An error occurred during recording. Please try again.",
-              variant: "destructive"
-            });
-            setIsRecording(false);
-          };
-          
-          toast({
-            title: "Camera ready",
-            description: "Tap the red button to start recording.",
-          });
-        } catch (codecErr) {
-          console.error("Error setting up MediaRecorder:", codecErr);
-        }
       }
     } catch (error) {
-      console.error("Video preview setup error:", error);
+      console.error("Error initializing video preview:", error);
       toast({
         title: "Camera access failed",
         description: "Could not access your camera. Please check permissions.",
         variant: "destructive"
       });
       
-      // Reset camera mode
       setCameraMode(null);
     } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Create safe URL wrapper functions with error handling
-  function createSafeObjectURL(blob: Blob) {
-    try {
-      return URL.createObjectURL(blob);
-    } catch (error) {
-      console.error('Error creating object URL:', error);
-      return '';
-    }
-  }
-  
-  function revokeSafeObjectURL(url: string) {
-    try {
-      if (url.startsWith('blob:')) {
-        URL.revokeObjectURL(url);
-      }
-    } catch (error) {
-      console.error('Error revoking object URL:', error);
-    }
-  }
-
-  const processVideoRecording = async () => {
-    try {
-      if (recordedChunksRef.current.length === 0) {
-        throw new Error("No video data recorded");
-      }
-      
-      // Set loading state
-      setIsLoading(true);
-      
-      console.log("Processing recorded video chunks:", recordedChunksRef.current.length);
-      
-      // Process the recorded chunks - use the first chunk's type if available, fallback to webm
-      const firstChunk = recordedChunksRef.current[0];
-      const detectedType = firstChunk && firstChunk.type ? firstChunk.type : 'video/webm';
-      console.log(`Creating video blob with type: ${detectedType}`);
-      const videoBlob = new Blob(recordedChunksRef.current, { type: detectedType });
-      console.log("Created video blob of size:", videoBlob.size);
-      
-      const tempVideoUrl = createSafeObjectURL(videoBlob);
-      
-      // Create temporary media item
-      const tempItem: MediaItem = {
-        id: `temp-${Date.now()}`,
-        type: 'video',
-        url: tempVideoUrl,
-        // No thumbnailUrl for video temp items
-        createdAt: new Date().toISOString()
-      };
-      
-      // Check if we've reached the maximum number of media items
-      if (media.length >= maxItems) {
-        toast({
-          title: "Maximum media limit reached",
-          description: `You can only have up to ${maxItems} items. Delete some to add more.`,
-          variant: "destructive"
-        });
-        setIsLoading(false);
-        return;
-      }
-
-      // Add to media collection with the temporary item
-      const updatedMediaWithTemp = [...media, tempItem];
-      onChange(updatedMediaWithTemp);
-      
-      toast({
-        title: "Video captured",
-        description: "Uploading to server..."
-      });
-      
-      // Upload the video to the server
-      const formData = new FormData();
-      const fileExtension = detectedType.includes('mp4') ? 'mp4' : 'webm';
-      console.log(`Using file extension .${fileExtension} based on detected type ${detectedType}`);
-      formData.append('file', videoBlob, `recording-${Date.now()}.${fileExtension}`);
-      
-      try {
-        const response = await fetch('/api/media/upload', {
-          method: 'POST',
-          body: formData
-        });
-        
-        if (!response.ok) {
-          throw new Error(`Upload failed: ${response.statusText}`);
-        }
-        
-        // Get the permanent media item from the server response
-        const mediaItem: MediaItem = await response.json();
-        console.log("Received permanent media item from server:", mediaItem);
-        
-        // Find the temporary item in the updated media array
-        const tempIndex = updatedMediaWithTemp.findIndex(item => item.id === tempItem.id);
-        
-        if (tempIndex !== -1) {
-          // Safely revoke the temporary object URL
-          revokeSafeObjectURL(tempItem.url);
-          
-          // Create a new array with the temporary item replaced by the permanent one
-          const finalUpdatedMedia = [
-            ...updatedMediaWithTemp.slice(0, tempIndex), 
-            mediaItem, 
-            ...updatedMediaWithTemp.slice(tempIndex + 1)
-          ];
-          
-          // Update with the permanent media item
-          onChange(finalUpdatedMedia);
-          
-          toast({
-            title: "Video captured",
-            description: "Video has been saved to the server."
-          });
-        } else {
-          console.error("Failed to find temporary item in media array");
-          // Just add the new permanent item
-          onChange([...media, mediaItem]);
-        }
-        
-        console.log("Video successfully processed and uploaded, returning to gallery view");
-        
-        // First stop all media tracks properly
-        if (mediaStreamRef.current) {
-          console.log("Stopping media tracks after successful upload");
-          mediaStreamRef.current.getTracks().forEach(track => {
-            console.log(`Stopping track: ${track.kind}`);
-            track.stop();
-          });
-          mediaStreamRef.current = null;
-        }
-        
-        // Then reset camera mode to avoid React state updates during navigation
-        console.log("Setting camera mode to null");
-        setCameraMode(null);
-      } catch (uploadError) {
-        console.error("Video upload error:", uploadError);
-        toast({
-          title: "Video upload failed",
-          description: "Failed to upload the video. Please try again.",
-          variant: "destructive"
-        });
-        
-        // Clean up the temporary item on error
-        const cleanMediaArray = updatedMediaWithTemp.filter(item => item.id !== tempItem.id);
-        onChange(cleanMediaArray);
-        
-        // Revoke the URL
-        revokeSafeObjectURL(tempItem.url);
-        
-        // Don't stop camera on error - just reset the recording state
-        setIsRecording(false);
-      }
-    } catch (error) {
-      console.error("Video processing error:", error);
-      toast({
-        title: "Video processing failed",
-        description: "Failed to process the video. Please try again.",
-        variant: "destructive"
-      });
-      
-      // Don't stop camera on error - just reset the recording state
-      setIsRecording(false);
-    } finally {
-      // Reset recorder state
-      recordedChunksRef.current = [];
-      mediaRecorderRef.current = null;
       setIsLoading(false);
     }
   };
 
   const startRecording = () => {
-    try {
-      if (mediaRecorderRef.current && !isRecording) {
-        console.log("Starting recording with MediaRecorder");
-        
-        // Make sure recorded chunks are empty before starting a new recording
-        recordedChunksRef.current = [];
-        
-        // Reset recording time counter
+    if (!isRecording && mediaRecorderRef.current) {
+      try {
+        // Reset recording time
         setRecordingTime(0);
         
-        // Start the recording timer
-        if (recordingTimerRef.current) {
-          clearInterval(recordingTimerRef.current);
-        }
-        
+        // Start the timer
         recordingTimerRef.current = setInterval(() => {
-          setRecordingTime(prev => prev + 1);
+          setRecordingTime(prevTime => prevTime + 1);
         }, 1000);
         
-        // Start recording WITH a timeslice parameter (100ms) to collect data during recording
-        // This ensures we get data chunks regularly throughout the recording
-        // rather than only at the end
-        mediaRecorderRef.current.start(100); // Collect data every 100ms
+        // Clear any previous recorded chunks
+        recordedChunksRef.current = [];
         
-        // Update UI state
+        // Start recording - request data every second
+        mediaRecorderRef.current.start(1000);
         setIsRecording(true);
         
         toast({
-          title: "Recording video",
-          description: "Tap the stop button when finished.",
+          title: "Recording started",
+          description: "Tap the square button when you want to stop recording."
         });
-      } else {
-        console.warn("Can't start recording - MediaRecorder not ready or already recording");
-        if (!mediaRecorderRef.current) {
-          // Try to reinitialize video preview instead of auto-recording
-          initializeVideoPreview().catch(error => {
-            console.error("Failed to re-initialize video preview:", error);
-            // On critical error, close camera view
-            setCameraMode(null);
-          });
-        }
+      } catch (error) {
+        console.error("Error starting recording:", error);
+        toast({
+          variant: "destructive",
+          title: "Recording failed",
+          description: "Could not start video recording. Please try again."
+        });
       }
-    } catch (error) {
-      console.error("Error starting recording:", error);
-      toast({
-        title: "Recording failed",
-        description: "Could not start recording. Please try again.",
-        variant: "destructive"
-      });
     }
   };
-  
+
   const stopRecording = () => {
-    console.log("stopRecording called, isRecording:", isRecording, "mediaRecorderRef exists:", !!mediaRecorderRef.current);
-    
-    try {
-      // First reset recording state to prevent UI confusion
-      setIsRecording(false);
-      
-      // Clear the recording timer
-      if (recordingTimerRef.current) {
-        clearInterval(recordingTimerRef.current);
-        recordingTimerRef.current = null;
-      }
-      
-      // Then try to properly stop the recording
-      if (mediaRecorderRef.current) {
-        console.log("Stopping MediaRecorder");
-        try {
-          // First explicitly request the data
-          if (typeof mediaRecorderRef.current.requestData === 'function') {
-            console.log("Explicitly requesting data before stopping");
-            mediaRecorderRef.current.requestData();
-          }
-          
-          // Small delay to ensure the data is processed before stopping
-          setTimeout(() => {
-            if (mediaRecorderRef.current) {
-              mediaRecorderRef.current.stop();
-              console.log("MediaRecorder stopped successfully after data request");
-            }
-          }, 100);
-        } catch (stopError) {
-          console.error("Error stopping MediaRecorder:", stopError);
-          // If stopping fails, immediately clean up everything
-          recordedChunksRef.current = [];
-          mediaRecorderRef.current = null;
-          
-          if (mediaStreamRef.current) {
-            console.log("Stopping all media tracks due to MediaRecorder stop error");
-            mediaStreamRef.current.getTracks().forEach(track => {
-              console.log(`Force stopping track: ${track.kind}`);
-              track.stop();
-            });
-            mediaStreamRef.current = null;
-          }
-          
-          // Reset camera mode
-          console.log("Resetting camera mode due to error");
-          setCameraMode(null);
-          
-          // Let user know about the error
-          toast({
-            title: "Recording error",
-            description: "Error while stopping recording. Media may not be saved.",
-            variant: "destructive"
-          });
-        }
-      } else {
-        console.warn("MediaRecorder not available, nothing to stop");
-        
-        // Still clean up media stream just in case
-        if (mediaStreamRef.current) {
-          console.log("Stopping orphaned media tracks");
-          mediaStreamRef.current.getTracks().forEach(track => track.stop());
-          mediaStreamRef.current = null;
-        }
-      }
-    } catch (error) {
-      console.error("Critical error in stopRecording:", error);
-      
-      // Safety cleanup in case of catastrophic error
-      if (mediaStreamRef.current) {
-        try {
-          console.log("Emergency media track cleanup");
-          mediaStreamRef.current.getTracks().forEach(track => track.stop());
-        } catch (cleanupError) {
-          console.error("Even cleanup failed:", cleanupError);
-        }
-        mediaStreamRef.current = null;
-      }
-      
-      mediaRecorderRef.current = null;
-      recordedChunksRef.current = [];
-      setIsRecording(false);
-      setCameraMode(null);
-      
-      toast({
-        title: "Recording failed",
-        description: "A critical error occurred. Please try again.",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const captureImage = async () => {
-    if (!cameraRef.current) {
-      toast({
-        title: "Camera error",
-        description: "Camera is not ready. Please try again.",
-        variant: "destructive"
-      });
-      return;
+    // Stop the recording timer
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
     }
     
-    try {
-      setIsLoading(true);
-      
-      // Check if we've reached the maximum number of media items
-      if (media.length >= maxItems) {
-        toast({
-          title: "Maximum media limit reached",
-          description: `You can only have up to ${maxItems} items. Delete some to add more.`,
-          variant: "destructive"
-        });
-        setIsLoading(false);
-        return;
-      }
-      
-      // Take the photo using react-camera-pro library
-      const photo = cameraRef.current.takePhoto();
-      console.log("Photo captured successfully");
-      
-      // Create a temporary item for immediate display
-      const tempItem: MediaItem = {
-        id: `temp-${Date.now()}`,
-        type: 'image',
-        url: photo,
-        thumbnailUrl: photo,
-        createdAt: new Date().toISOString()
-      };
-      
-      // Add to media collection while preserving existing items
-      const updatedMediaWithTemp = [...media, tempItem];
-      onChange(updatedMediaWithTemp);
-      
-      // Reset camera state
-      setCameraMode(null);
-      
-      toast({
-        title: "Image captured",
-        description: "Uploading to server..."
-      });
-      
+    // Stop the recorder
+    if (mediaRecorderRef.current && isRecording) {
       try {
-        // Convert the base64 image to a blob for upload
-        const response = await fetch(photo);
-        const blob = await response.blob();
-        
-        // Upload the image to the server
-        const formData = new FormData();
-        formData.append('file', blob, `capture-${Date.now()}.jpg`);
-        
-        const uploadResponse = await fetch('/api/media/upload', {
-          method: 'POST',
-          body: formData
-        });
-        
-        if (!uploadResponse.ok) {
-          throw new Error(`Upload failed: ${uploadResponse.statusText}`);
-        }
-        
-        // Get the permanent media item from the server response
-        const mediaItem: MediaItem = await uploadResponse.json();
-        console.log("Received permanent image from server:", mediaItem);
-        
-        // Find the temporary item in the updated media array
-        const tempIndex = updatedMediaWithTemp.findIndex(item => item.id === tempItem.id);
-        
-        if (tempIndex !== -1) {
-          // Create a new array with the temporary item replaced by the permanent one
-          const finalUpdatedMedia = [
-            ...updatedMediaWithTemp.slice(0, tempIndex), 
-            mediaItem, 
-            ...updatedMediaWithTemp.slice(tempIndex + 1)
-          ];
-          
-          // Update with the permanent media item
-          onChange(finalUpdatedMedia);
-          
-          toast({
-            title: "Image captured",
-            description: "Image has been saved to the server."
-          });
-        } else {
-          console.error("Failed to find temporary image in media array");
-          // Just add the new permanent item
-          onChange([...media, mediaItem]);
-        }
-      } catch (uploadError) {
-        console.error("Image upload error:", uploadError);
-        toast({
-          title: "Image upload failed",
-          description: "Failed to upload the image. Please try again.",
-          variant: "destructive"
-        });
-        
-        // Clean up the temporary item on error
-        const cleanMediaArray = updatedMediaWithTemp.filter(item => item.id !== tempItem.id);
-        onChange(cleanMediaArray);
+        mediaRecorderRef.current.stop();
+      } catch (error) {
+        console.error("Error stopping recorder:", error);
+        processVideoRecording(); // Try to process anyway
       }
-    } catch (error) {
-      console.error("Image capture error:", error);
-      toast({
-        title: "Failed to capture image",
-        description: "There was an error capturing the image.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const stopCamera = () => {
-    // Stop recording if active
-    if (isRecording && mediaRecorderRef.current) {
-      mediaRecorderRef.current.stop();
+    } else {
       setIsRecording(false);
     }
-    
-    // Stop all tracks in the media stream
-    if (mediaStreamRef.current) {
-      mediaStreamRef.current.getTracks().forEach(track => track.stop());
-      mediaStreamRef.current = null;
-    }
-    
-    // Reset state
-    setCameraMode(null);
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'video') => {
-    const files = e.target.files;
-    if (!files?.length) return;
-
+  const processVideoRecording = async () => {
     try {
-      setIsLoading(true);
-      
-      // Check if adding these files would exceed the limit
-      if (media.length + files.length > maxItems) {
+      if (recordedChunksRef.current.length === 0) {
         toast({
-          title: "Maximum media limit reached",
-          description: `You can only upload up to ${maxItems} files.`,
-          variant: "destructive"
+          variant: "destructive",
+          title: "Recording failed",
+          description: "No video data was captured. Please try again."
         });
+        setIsRecording(false);
         return;
       }
       
-      const newItems: MediaItem[] = [];
+      // Create a blob from all chunks
+      const mimeType = recordedChunksRef.current[0].type || 'video/webm';
+      const videoBlob = new Blob(recordedChunksRef.current, { type: mimeType });
       
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        
-        // Create a temporary object URL for immediate display
-        const tempObjectUrl = URL.createObjectURL(file);
-        const tempItem: MediaItem = {
-          id: `temp-${Date.now()}-${i}`,
-          type,
-          url: tempObjectUrl,
-          thumbnailUrl: type === 'video' ? undefined : tempObjectUrl,
-          createdAt: new Date().toISOString()
-        };
-        
-        // Add temporary item to show immediate feedback
-        newItems.push(tempItem);
-        
-        // Prepare form data for upload
-        const formData = new FormData();
-        formData.append('file', file);
-        
-        try {
-          // Upload the file to the server
-          const response = await fetch('/api/media/upload', {
-            method: 'POST',
-            body: formData
-          });
-          
-          if (!response.ok) {
-            throw new Error(`Upload failed: ${response.statusText}`);
-          }
-          
-          // Get the permanent media item from the server response
-          const mediaItem: MediaItem = await response.json();
-          
-          // Replace the temporary item with the permanent one
-          const itemIndex = newItems.findIndex(item => item.id === tempItem.id);
-          if (itemIndex !== -1) {
-            // Revoke the temporary object URL
-            URL.revokeObjectURL(tempItem.url);
-            if (tempItem.thumbnailUrl) {
-              URL.revokeObjectURL(tempItem.thumbnailUrl);
-            }
-            
-            // Replace with permanent item
-            newItems[itemIndex] = mediaItem;
-          }
-        } catch (uploadError) {
-          console.error('File upload error:', uploadError);
-          toast({
-            title: "Upload failed",
-            description: "Could not upload file to server.",
-            variant: "destructive"
-          });
-        }
-      }
+      // Convert to file for upload
+      const file = new File(
+        [videoBlob],
+        `video_${Date.now()}.${mimeType.includes('mp4') ? 'mp4' : 'webm'}`,
+        { type: mimeType }
+      );
       
-      // Update media state with new items
-      onChange([...media, ...newItems]);
+      // Upload the file
+      await handleFileUpload(file, 'video');
       
-      // Reset the file input
-      if (type === 'image' && fileInputRef.current) {
-        fileInputRef.current.value = '';
-      } else if (type === 'video' && videoInputRef.current) {
-        videoInputRef.current.value = '';
-      }
+      // Clear the recorded chunks
+      recordedChunksRef.current = [];
     } catch (error) {
+      console.error("Error processing video:", error);
       toast({
-        title: "Failed to process media",
-        description: error instanceof Error ? error.message : "An unexpected error occurred",
-        variant: "destructive"
+        variant: "destructive",
+        title: "Video processing failed",
+        description: "There was an error processing the recorded video."
       });
     } finally {
-      setIsLoading(false);
+      setIsRecording(false);
     }
   };
 
-  const handleRemoveMedia = async (index: number) => {
-    const newMedia = [...media];
+  // File Upload Operations
+  const handleFileInput = async (event: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'video') => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
     
-    // Get the item to be removed
-    const item = newMedia[index];
-    
-    try {
-      // If it's a temporary object URL, release it
-      if (item.url.startsWith('blob:') || item.url.startsWith('data:')) {
-        if (item.url.startsWith('blob:')) {
-          URL.revokeObjectURL(item.url);
-        }
-        if (item.thumbnailUrl?.startsWith('blob:')) {
-          URL.revokeObjectURL(item.thumbnailUrl);
-        }
-      } 
-      // If it's a server item (has an ID not starting with 'temp-'), delete it from the server
-      else if (!item.id.startsWith('temp-')) {
-        const response = await fetch(`/api/media/delete/${item.id}`, {
-          method: 'DELETE'
+    // Process each file
+    for (let i = 0; i < files.length; i++) {
+      if (media.length + i >= maxItems) {
+        toast({
+          title: "Maximum media reached",
+          description: `You can only add up to ${maxItems} media items.`
         });
-        
-        if (!response.ok) {
-          throw new Error(`Failed to delete file: ${response.statusText}`);
-        }
+        break;
       }
       
-      // Remove the item from the array
-      newMedia.splice(index, 1);
-      onChange(newMedia);
+      const file = files[i];
+      await handleFileUpload(file, type);
+    }
+    
+    // Reset the input value to allow re-selecting the same file
+    event.target.value = '';
+  };
+
+  const handleFileUpload = async (file: File, type: 'image' | 'video') => {
+    // Create a temporary media item with a local URL
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const tempUrl = URL.createObjectURL(file);
+    
+    const tempItem: MediaItem = {
+      id: tempId,
+      type,
+      url: tempUrl,
+      createdAt: new Date().toISOString()
+    };
+    
+    // Add it to the media array
+    const updatedMedia = [...media, tempItem];
+    onChange(updatedMedia);
+    
+    try {
+      // Create form data for upload
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('type', type);
+      
+      // Upload to server
+      const response = await fetch('/api/media/upload', {
+        method: 'POST',
+        body: formData
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Upload failed with status: ${response.status}`);
+      }
+      
+      // Get the media item from the response
+      const mediaItem: MediaItem = await response.json();
+      
+      // Replace the temporary item with the real one
+      const finalMedia = updatedMedia.map(item => 
+        item.id === tempId ? mediaItem : item
+      );
+      
+      onChange(finalMedia);
+      
+      // Clean up the temporary URL
+      URL.revokeObjectURL(tempUrl);
       
       toast({
-        title: "Media removed",
-        description: "The item has been deleted."
+        title: "Upload successful",
+        description: `${type === 'image' ? 'Image' : 'Video'} was uploaded successfully.`
       });
     } catch (error) {
-      console.error('Error removing media:', error);
+      console.error("Upload error:", error);
+      
+      // Remove the temporary item
+      const filteredMedia = updatedMedia.filter(item => item.id !== tempId);
+      onChange(filteredMedia);
+      
+      // Clean up the temporary URL
+      URL.revokeObjectURL(tempUrl);
+      
       toast({
-        title: "Removal failed",
-        description: "Failed to remove the media item.",
-        variant: "destructive"
+        variant: "destructive",
+        title: "Upload failed",
+        description: "There was an error uploading your media. Please try again."
       });
     }
   };
 
-  const switchFacingMode = () => {
-    setFacingMode(current => current === 'environment' ? 'user' : 'environment');
+  const handleRemoveMedia = (index: number) => {
+    const updatedMedia = [...media];
+    const removedItem = updatedMedia[index];
+    
+    // Remove from array
+    updatedMedia.splice(index, 1);
+    onChange(updatedMedia);
+    
+    // If it's a temporary URL (blob), revoke it
+    if (removedItem.url.startsWith('blob:')) {
+      try {
+        URL.revokeObjectURL(removedItem.url);
+      } catch (e) {
+        console.error("Error revoking URL:", e);
+      }
+    }
+    
+    // If it's a server-stored item, you may want to delete it from the server
+    // This depends on your API design
+    if (!removedItem.url.startsWith('blob:')) {
+      fetch(`/api/media/${removedItem.id}`, { method: 'DELETE' })
+        .catch(error => {
+          console.error("Error deleting media from server:", error);
+        });
+    }
   };
 
   return (
     <div className={`space-y-4 ${className || ''}`}>
-      {/* Hidden file inputs for fallback upload */}
-      <input 
-        type="file" 
+      {/* File inputs for upload */}
+      <input
+        type="file"
         ref={fileInputRef}
+        onChange={(e) => handleFileInput(e, 'image')}
         accept="image/*"
-        onChange={(e) => handleFileChange(e, 'image')}
-        style={{ display: 'none' }}
-        multiple
+        className="hidden"
+        capture="environment"
       />
-      <input 
-        type="file" 
+      <input
+        type="file"
         ref={videoInputRef}
+        onChange={(e) => handleFileInput(e, 'video')}
         accept="video/*"
-        onChange={(e) => handleFileChange(e, 'video')}
-        style={{ display: 'none' }}
-        multiple
+        className="hidden"
+        capture="environment"
       />
       
       {/* Camera UI */}
-      {cameraMode === 'image' && (
-        <div className="relative w-full aspect-square overflow-hidden rounded-lg">
-          <Camera
-            ref={cameraRef}
-            facingMode={facingMode}
-            aspectRatio={1}
-            errorMessages={{
-              noCameraAccessible: 'Camera not available. Please check permissions.',
-              permissionDenied: 'Camera permission denied. Please allow camera access.',
-              switchCamera: 'Cannot switch camera. Device may have only one camera.',
-              canvas: 'Canvas not supported.'
-            }}
-          />
-          
-          {/* Camera controls */}
-          <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black to-transparent p-4 flex justify-center items-center">
-            <div className="relative">
-              <button 
-                className="w-16 h-16 rounded-full bg-white flex items-center justify-center border-4 border-white shadow-xl focus:outline-none"
-                onClick={captureImage}
-                disabled={isLoading}
+      {cameraMode && (
+        <div className="relative">
+          {/* Camera mode toggle */}
+          <div className="absolute top-4 left-0 right-0 z-10 flex justify-center">
+            <div className="bg-black/50 inline-flex rounded-lg p-1">
+              <button
+                type="button"
+                className={`px-3 py-1 rounded-md text-sm flex items-center ${cameraMode === 'image' ? 'bg-white text-primary font-medium' : 'text-white'}`}
+                onClick={() => {
+                  if (cameraMode !== 'image') {
+                    // Stop current stream if needed
+                    if (mediaStreamRef.current) {
+                      mediaStreamRef.current.getTracks().forEach(track => track.stop());
+                      mediaStreamRef.current = null;
+                    }
+                    // Update both state variables
+                    setCameraMode('image');
+                    setUploadType('image');
+                  }
+                }}
               >
-                <div className="w-12 h-12 rounded-full bg-white border-2 border-gray-300"></div>
+                <CameraIcon className="h-4 w-4 mr-2" />
+                Photo
               </button>
-              {isLoading && (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-10 h-10 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
-                </div>
-              )}
+              <button
+                type="button"
+                className={`px-3 py-1 rounded-md text-sm flex items-center ${cameraMode === 'video' ? 'bg-white text-primary font-medium' : 'text-white'}`}
+                onClick={() => {
+                  if (cameraMode !== 'video') {
+                    // Stop current recording if needed
+                    if (isRecording) {
+                      stopRecording();
+                    }
+                    // Switch to video mode
+                    setCameraMode('video');
+                    setUploadType('video');
+                    // Initialize the video preview
+                    initializeVideoPreview();
+                  }
+                }}
+              >
+                <Video className="h-4 w-4 mr-2" />
+                Video
+              </button>
             </div>
           </div>
           
-          {/* Close and switch camera buttons */}
-          <button 
-            className="absolute top-4 left-4 bg-black/50 text-white w-10 h-10 rounded-full flex items-center justify-center"
-            onClick={() => switchCameraMode(null)}
-          >
-            <X className="w-6 h-6" />
-          </button>
-          
-          <button 
-            className="absolute top-4 right-4 bg-black/50 text-white w-10 h-10 rounded-full flex items-center justify-center"
-            onClick={switchFacingMode}
-          >
-            <RotateCcw className="w-6 h-6" />
-          </button>
-        </div>
-      )}
-      
-      {/* Video recording UI */}
-      {cameraMode === 'video' && (
-        <div className="relative w-full aspect-video overflow-hidden rounded-lg bg-black">
-          <video 
-            ref={videoRef}
-            className="w-full h-full object-cover"
-            autoPlay 
-            playsInline
-            muted
-          />
-          
-          {/* Recording indicator */}
-          {isRecording && (
-            <div className="absolute top-4 right-4 flex items-center bg-red-600 text-white px-3 py-1 rounded-full">
-              <div className="w-2 h-2 bg-white rounded-full mr-2 animate-pulse" />
-              <span className="text-xs font-medium">REC {formatTime(recordingTime)}</span>
+          {cameraMode === 'image' && (
+            <div className="w-full aspect-square overflow-hidden rounded-lg">
+              <Camera
+                ref={cameraRef}
+                facingMode={facingMode}
+                aspectRatio={1}
+                errorMessages={{
+                  noCameraAccessible: 'Camera not available. Please check permissions.',
+                  permissionDenied: 'Camera permission denied. Please allow camera access.',
+                  switchCamera: 'Cannot switch camera. Device may have only one camera.',
+                  canvas: 'Canvas not supported.'
+                }}
+              />
             </div>
           )}
           
-          {/* Video controls */}
-          <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black to-transparent p-4 flex justify-center items-center">
-            <button 
-              className={`w-16 h-16 rounded-full flex items-center justify-center shadow-xl focus:outline-none ${isRecording ? 'bg-red-600' : 'bg-white'}`}
-              onClick={isRecording ? stopRecording : startRecording}
-              disabled={isLoading}
-            >
-              {isRecording ? (
-                <div className="w-8 h-8 bg-white rounded-sm"></div>
-              ) : (
-                <div className="w-8 h-8 bg-red-600 rounded-full"></div>
+          {cameraMode === 'video' && (
+            <div className="w-full aspect-video overflow-hidden rounded-lg bg-black">
+              <video 
+                ref={videoRef}
+                className="w-full h-full object-cover"
+                autoPlay 
+                playsInline 
+                muted
+              />
+              
+              {isRecording && (
+                <div className="absolute top-14 right-4 bg-destructive text-white text-xs rounded-full px-2 py-1 flex items-center animate-pulse">
+                  <span className="mr-1 h-2 w-2 rounded-full bg-white inline-block"></span>
+                  {formatTime(recordingTime)}
+                </div>
               )}
+            </div>
+          )}
+          
+          {/* Camera controls - common for both modes */}
+          <div className="absolute bottom-0 left-0 right-0 flex justify-center p-4 gap-4">
+            <button
+              type="button"
+              className="bg-white rounded-full p-3 shadow-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              onClick={switchFacingMode}
+            >
+              <RefreshCw className="h-6 w-6 text-primary" />
+            </button>
+            
+            {cameraMode === 'image' ? (
+              <button
+                type="button"
+                className="bg-primary rounded-full p-3 shadow-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                onClick={captureImage}
+                disabled={isLoading}
+              >
+                <CameraIcon className="h-6 w-6 text-white" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                className={`${isRecording ? 'bg-destructive' : 'bg-primary'} rounded-full p-3 shadow-lg focus:outline-none focus:ring-2 focus:ring-primary relative`}
+                onClick={() => {
+                  if (isRecording) {
+                    stopRecording();
+                  } else {
+                    startRecording();
+                  }
+                }}
+                disabled={isLoading}
+              >
+                {isRecording ? (
+                  <Square className="h-6 w-6 text-white" />
+                ) : (
+                  <Circle className="h-6 w-6 text-white fill-current" />
+                )}
+              </button>
+            )}
+            
+            <button
+              type="button"
+              className="bg-white rounded-full p-3 shadow-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              onClick={() => switchCameraMode(null)}
+            >
+              <X className="h-6 w-6 text-destructive" />
             </button>
           </div>
-          
-          {/* Close and switch camera buttons */}
-          <button 
-            className="absolute top-4 left-4 bg-black/50 text-white w-10 h-10 rounded-full flex items-center justify-center"
-            onClick={() => switchCameraMode(null)}
-          >
-            <X className="w-6 h-6" />
-          </button>
-          
-          <button 
-            className="absolute top-4 right-16 bg-black/50 text-white w-10 h-10 rounded-full flex items-center justify-center"
-            onClick={switchFacingMode}
-          >
-            <RotateCcw className="w-6 h-6" />
-          </button>
         </div>
       )}
       

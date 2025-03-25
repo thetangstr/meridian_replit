@@ -40,6 +40,74 @@ export function MediaCapture({
   onChange,
   className
 }: MediaCaptureProps) {
+  // Helper function to format seconds into mm:ss format
+  const formatTime = (seconds: number): string => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
+  
+  // Helper functions for camera operations
+  const captureImage = async () => {
+    if (cameraRef.current) {
+      try {
+        setIsLoading(true);
+        const photo = cameraRef.current.takePhoto();
+        await handleCapturedPhoto(photo);
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Error taking photo:', error);
+        toast({
+          variant: "destructive",
+          title: "Failed to capture photo",
+          description: "There was an error while trying to take the photo."
+        });
+        setIsLoading(false);
+      }
+    }
+  };
+  
+  const switchFacingMode = () => {
+    setFacingMode(facingMode === 'environment' ? 'user' : 'environment');
+    
+    // For video mode, we need to restart the preview
+    if (cameraMode === 'video' && mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach(track => track.stop());
+      mediaStreamRef.current = null;
+      
+      // Re-initialize the preview
+      initializeVideoPreview();
+    }
+  };
+  
+  const startRecording = () => {
+    if (!isRecording && mediaRecorderRef.current) {
+      try {
+        // Reset recording time
+        setRecordingTime(0);
+        
+        // Start the timer
+        recordingTimerRef.current = setInterval(() => {
+          setRecordingTime(prevTime => prevTime + 1);
+        }, 1000);
+        
+        // Start recording - request data every second
+        mediaRecorderRef.current.start(1000);
+        setIsRecording(true);
+        
+        console.log("Recording started");
+      } catch (error) {
+        console.error("Error starting recording:", error);
+        toast({
+          variant: "destructive",
+          title: "Recording failed",
+          description: "Could not start video recording. Please try again."
+        });
+      }
+    } else {
+      console.warn("MediaRecorder not ready or already recording");
+    }
+  };
   const { toast } = useToast();
   const cameraRef = useRef<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -48,7 +116,12 @@ export function MediaCapture({
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
   const [isLoading, setIsLoading] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
   const [cameraSupported, setCameraSupported] = useState(true);
+  const [uploadType, setUploadType] = useState<'image' | 'video'>('image');
+  
+  // Ref for recording timer interval
+  const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
@@ -378,12 +451,25 @@ export function MediaCapture({
       } else {
         // Set up MediaRecorder but don't start it yet
         try {
-          // Try to use the most basic, universally supported codec options
+          // Try to use codecs that are more widely supported
           let options = {};
           
-          if (MediaRecorder.isTypeSupported('video/webm')) {
-            options = { mimeType: 'video/webm' };
-            console.log("Using video/webm format");
+          // The order is important - try best quality first, then fallback options
+          const possibleTypes = [
+            'video/webm;codecs=vp9,opus',
+            'video/webm;codecs=vp8,opus', 
+            'video/webm;codecs=h264,opus',
+            'video/mp4;codecs=h264,aac',
+            'video/webm',
+            'video/mp4'
+          ];
+          
+          for (const type of possibleTypes) {
+            if (MediaRecorder.isTypeSupported(type)) {
+              options = { mimeType: type };
+              console.log(`Using ${type} format for video recording - browser confirms support`);
+              break;
+            }
           }
           
           console.log("Creating (but not starting) MediaRecorder");
@@ -393,9 +479,14 @@ export function MediaCapture({
           // Set up data handling for future recording
           // Only request data when the recording is stopped, not continuously
           mediaRecorder.ondataavailable = (event) => {
+            console.log(`Data available: ${event.data?.size || 0} bytes, type: ${event.data?.type || 'unknown'}`);
+            
             if (event.data && event.data.size > 0) {
-              console.log(`Data available: ${event.data.size} bytes`);
               recordedChunksRef.current.push(event.data);
+              console.log(`Added data chunk, total chunks: ${recordedChunksRef.current.length}, total data: ${
+                recordedChunksRef.current.reduce((sum, chunk) => sum + chunk.size, 0)} bytes`);
+            } else {
+              console.log("WARNING: Received empty data chunk");
             }
           };
           
@@ -478,8 +569,11 @@ export function MediaCapture({
       
       console.log("Processing recorded video chunks:", recordedChunksRef.current.length);
       
-      // Process the recorded chunks
-      const videoBlob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
+      // Process the recorded chunks - use the first chunk's type if available, fallback to webm
+      const firstChunk = recordedChunksRef.current[0];
+      const detectedType = firstChunk && firstChunk.type ? firstChunk.type : 'video/webm';
+      console.log(`Creating video blob with type: ${detectedType}`);
+      const videoBlob = new Blob(recordedChunksRef.current, { type: detectedType });
       console.log("Created video blob of size:", videoBlob.size);
       
       const tempVideoUrl = createSafeObjectURL(videoBlob);
@@ -515,7 +609,9 @@ export function MediaCapture({
       
       // Upload the video to the server
       const formData = new FormData();
-      formData.append('file', videoBlob, `recording-${Date.now()}.webm`);
+      const fileExtension = detectedType.includes('mp4') ? 'mp4' : 'webm';
+      console.log(`Using file extension .${fileExtension} based on detected type ${detectedType}`);
+      formData.append('file', videoBlob, `recording-${Date.now()}.${fileExtension}`);
       
       try {
         const response = await fetch('/api/media/upload', {
@@ -617,18 +713,22 @@ export function MediaCapture({
         // Make sure recorded chunks are empty before starting a new recording
         recordedChunksRef.current = [];
         
-        // Start recording WITHOUT a timeslice parameter, but explicitly request data
-        // on stop
-        mediaRecorderRef.current.start();
+        // Reset recording time counter
+        setRecordingTime(0);
         
-        // Explicitly request data when recording stops
-        mediaRecorderRef.current.addEventListener('stop', () => {
-          console.log("Adding stop event listener to explicitly request data");
-          // This ensures data is available even if the browser doesn't automatically trigger it
-          if (mediaRecorderRef.current && typeof mediaRecorderRef.current.requestData === 'function') {
-            mediaRecorderRef.current.requestData();
-          }
-        });
+        // Start the recording timer
+        if (recordingTimerRef.current) {
+          clearInterval(recordingTimerRef.current);
+        }
+        
+        recordingTimerRef.current = setInterval(() => {
+          setRecordingTime(prev => prev + 1);
+        }, 1000);
+        
+        // Start recording WITH a timeslice parameter (100ms) to collect data during recording
+        // This ensures we get data chunks regularly throughout the recording
+        // rather than only at the end
+        mediaRecorderRef.current.start(100); // Collect data every 100ms
         
         // Update UI state
         setIsRecording(true);
@@ -664,6 +764,12 @@ export function MediaCapture({
     try {
       // First reset recording state to prevent UI confusion
       setIsRecording(false);
+      
+      // Clear the recording timer
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+        recordingTimerRef.current = null;
+      }
       
       // Then try to properly stop the recording
       if (mediaRecorderRef.current) {
@@ -1045,7 +1151,54 @@ export function MediaCapture({
       />
       
       {/* Camera UI */}
-      {cameraMode === 'image' && (
+      {cameraMode && (
+        <div className="relative">
+          {/* Camera mode toggle */}
+          <div className="absolute top-4 left-0 right-0 z-10 flex justify-center">
+            <div className="bg-black/50 inline-flex rounded-lg p-1">
+              <button
+                type="button"
+                className={`px-3 py-1 rounded-md text-sm flex items-center ${cameraMode === 'image' ? 'bg-white text-primary font-medium' : 'text-white'}`}
+                onClick={() => {
+                  if (cameraMode !== 'image') {
+                    // Stop current stream if needed
+                    if (mediaStreamRef.current) {
+                      mediaStreamRef.current.getTracks().forEach(track => track.stop());
+                      mediaStreamRef.current = null;
+                    }
+                    // Update both state variables
+                    setCameraMode('image');
+                    setUploadType('image');
+                  }
+                }}
+              >
+                <CameraIcon className="h-4 w-4 mr-2" />
+                Photo
+              </button>
+              <button
+                type="button"
+                className={`px-3 py-1 rounded-md text-sm flex items-center ${cameraMode === 'video' ? 'bg-white text-primary font-medium' : 'text-white'}`}
+                onClick={() => {
+                  if (cameraMode !== 'video') {
+                    // Stop current recording if needed
+                    if (isRecording) {
+                      stopRecording();
+                    }
+                    // Switch to video mode
+                    setCameraMode('video');
+                    setUploadType('video');
+                    // Initialize the video preview
+                    initializeVideoPreview();
+                  }
+                }}
+              >
+                <Video className="h-4 w-4 mr-2" />
+                Video
+              </button>
+            </div>
+          </div>
+          
+          {cameraMode === 'image' && (
         <div className="relative w-full aspect-square overflow-hidden rounded-lg">
           <Camera
             ref={cameraRef}
@@ -1109,7 +1262,7 @@ export function MediaCapture({
           {isRecording && (
             <div className="absolute top-4 right-4 flex items-center bg-red-600 text-white px-3 py-1 rounded-full">
               <div className="w-2 h-2 bg-white rounded-full mr-2 animate-pulse" />
-              <span className="text-xs font-medium">REC</span>
+              <span className="text-xs font-medium">REC {formatTime(recordingTime)}</span>
             </div>
           )}
           
@@ -1148,56 +1301,61 @@ export function MediaCapture({
       {/* Camera mode selection buttons */}
       {cameraMode === null && (
         <div className="grid grid-cols-2 gap-4">
+          <div className="col-span-2 flex justify-center mb-2">
+            <div className="bg-muted inline-flex rounded-lg p-1">
+              <Button
+                variant={uploadType === 'image' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setUploadType('image')}
+                className="relative px-3"
+              >
+                <CameraIcon className="h-4 w-4 mr-2" />
+                Photo
+              </Button>
+              <Button
+                variant={uploadType === 'video' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setUploadType('video')}
+                className="relative px-3"
+              >
+                <Video className="h-4 w-4 mr-2" />
+                Video
+              </Button>
+            </div>
+          </div>
+          
           <Button 
             variant="outline"
             size="lg"
             className="flex flex-col items-center justify-center h-24 py-2"
-            onClick={() => switchCameraMode('image')}
+            onClick={() => switchCameraMode(uploadType)}
             disabled={isLoading || media.length >= maxItems}
           >
             <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-1">
-              <CameraIcon className="h-6 w-6 text-primary" />
+              {uploadType === 'image' ? (
+                <CameraIcon className="h-6 w-6 text-primary" />
+              ) : (
+                <Video className="h-6 w-6 text-primary" />
+              )}
             </div>
-            <span className="text-sm font-medium">Take Photo</span>
+            <span className="text-sm font-medium">
+              {uploadType === 'image' ? 'Take Photo' : 'Record Video'}
+            </span>
           </Button>
           
           <Button 
             variant="outline"
             size="lg"
             className="flex flex-col items-center justify-center h-24 py-2"
-            onClick={() => switchCameraMode('video')}
-            disabled={isLoading || media.length >= maxItems}
-          >
-            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-1">
-              <Video className="h-6 w-6 text-primary" />
-            </div>
-            <span className="text-sm font-medium">Record Video</span>
-          </Button>
-          
-          <Button 
-            variant="outline"
-            size="lg"
-            className="flex flex-col items-center justify-center h-24 py-2"
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => uploadType === 'image' ? fileInputRef.current?.click() : videoInputRef.current?.click()}
             disabled={isLoading || media.length >= maxItems}
           >
             <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-1">
               <Upload className="h-6 w-6 text-primary" />
             </div>
-            <span className="text-sm font-medium">Upload Photo</span>
-          </Button>
-          
-          <Button 
-            variant="outline"
-            size="lg"
-            className="flex flex-col items-center justify-center h-24 py-2"
-            onClick={() => videoInputRef.current?.click()}
-            disabled={isLoading || media.length >= maxItems}
-          >
-            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-1">
-              <Upload className="h-6 w-6 text-primary" />
-            </div>
-            <span className="text-sm font-medium">Upload Video</span>
+            <span className="text-sm font-medium">
+              {uploadType === 'image' ? 'Upload Photo' : 'Upload Video'}
+            </span>
           </Button>
         </div>
       )}
