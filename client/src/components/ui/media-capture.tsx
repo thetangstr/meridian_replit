@@ -48,7 +48,11 @@ export function MediaCapture({
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
   const [isLoading, setIsLoading] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
   const [cameraSupported, setCameraSupported] = useState(true);
+  
+  // Ref for recording timer interval
+  const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
@@ -640,14 +644,22 @@ export function MediaCapture({
         // Make sure recorded chunks are empty before starting a new recording
         recordedChunksRef.current = [];
         
+        // Reset recording time counter
+        setRecordingTime(0);
+        
+        // Start the recording timer
+        if (recordingTimerRef.current) {
+          clearInterval(recordingTimerRef.current);
+        }
+        
+        recordingTimerRef.current = setInterval(() => {
+          setRecordingTime(prev => prev + 1);
+        }, 1000);
+        
         // Start recording WITH a timeslice parameter (100ms) to collect data during recording
         // This ensures we get data chunks regularly throughout the recording
         // rather than only at the end
         mediaRecorderRef.current.start(100); // Collect data every 100ms
-        
-        // Explicitly request data just BEFORE recording stops, not AFTER
-        // This ensures we have data available when the stop event triggers
-        // We're not using the 'stop' event listener because the recorder would already be inactive
         
         // Update UI state
         setIsRecording(true);
@@ -683,6 +695,12 @@ export function MediaCapture({
     try {
       // First reset recording state to prevent UI confusion
       setIsRecording(false);
+      
+      // Clear the recording timer
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+        recordingTimerRef.current = null;
+      }
       
       // Then try to properly stop the recording
       if (mediaRecorderRef.current) {
@@ -1128,7 +1146,7 @@ export function MediaCapture({
           {isRecording && (
             <div className="absolute top-4 right-4 flex items-center bg-red-600 text-white px-3 py-1 rounded-full">
               <div className="w-2 h-2 bg-white rounded-full mr-2 animate-pulse" />
-              <span className="text-xs font-medium">REC</span>
+              <span className="text-xs font-medium">REC {formatTime(recordingTime)}</span>
             </div>
           )}
           
