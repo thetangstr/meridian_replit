@@ -57,7 +57,7 @@ function Router() {
       await checkAuth();
       
       // After checking auth, redirect to login if not authenticated
-      if (!isAuthenticated && location !== '/login') {
+      if (!isAuthenticated && location !== '/login' && location !== '/media-test' && !location.startsWith('/media-test/')) {
         console.log('Not authenticated, redirecting to login');
         setLocation('/login');
       }
@@ -68,7 +68,7 @@ function Router() {
   
   // Force redirect to login during initial load
   useEffect(() => {
-    if (loading === false && !isAuthenticated && location !== '/login') {
+    if (loading === false && !isAuthenticated && location !== '/login' && location !== '/media-test' && !location.startsWith('/media-test/')) {
       console.log('Not authenticated (after load), redirecting to login');
       setLocation('/login');
     }
@@ -95,6 +95,9 @@ function Router() {
       {/* Public routes */}
       <Route path="/login" component={(props) => <AuthRoute component={Login} {...props} />} />
       
+      {/* Media Test route - fully public for test purposes */}
+      <Route path="/media-test" component={MediaTestPage} />
+      
       {/* All authenticated routes wrapped in AuthenticatedLayout */}
       <Route>
         <AuthenticatedLayout>
@@ -117,9 +120,6 @@ function Router() {
             <Route path="/reports/:id" component={(props) => 
               <PrivateRoute component={ReportView} {...props} />
             } />
-            
-            {/* Media Test route - not requiring authentication for test purposes */}
-            <Route path="/media-test" component={MediaTestPage} />
             
             {/* Admin routes */}
             <Route path="/admin" component={(props) => 
