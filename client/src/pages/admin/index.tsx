@@ -107,7 +107,10 @@ export default function AdminDashboard() {
   // Update task weights
   const updateTaskWeights = useMutation({
     mutationFn: async (weights: typeof taskLevelWeights) => {
-      return await apiRequest('PATCH', '/api/admin/scoring-config/task', weights);
+      return await apiRequest('/api/admin/scoring-config/task', {
+        method: 'PATCH',
+        body: JSON.stringify(weights)
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/scoring-config'] });
@@ -151,7 +154,10 @@ export default function AdminDashboard() {
   // Sync CUJ data mutation
   const syncCujData = useMutation({
     mutationFn: async () => {
-      return await apiRequest('POST', '/api/admin/sync-cuj-data', {});
+      return await apiRequest('/api/admin/sync-cuj-data', {
+        method: 'POST',
+        body: JSON.stringify({})
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/cuj-sync-status'] });
