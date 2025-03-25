@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -87,7 +87,7 @@ export default function AdminDashboard() {
   });
   
   // Set initial weights when data is loaded
-  useState(() => {
+  useEffect(() => {
     if (config) {
       setTaskLevelWeights({
         doableWeight: config.taskDoableWeight,
@@ -102,7 +102,7 @@ export default function AdminDashboard() {
         emotionalWeight: config.categoryEmotionalWeight
       });
     }
-  });
+  }, [config]);
   
   // Update task weights
   const updateTaskWeights = useMutation({
@@ -271,234 +271,232 @@ export default function AdminDashboard() {
         </TabsList>
         
         <TabsContent value="config" className="space-y-6 mt-6">
-      
-      <div className="space-y-6">
-        {/* Task Score Configuration */}
-        <Card className="overflow-hidden">
-          <div className="p-4 bg-primary bg-opacity-5 border-b border-gray-200">
-            <h3 className="font-medium text-lg text-primary">Task Level Scoring</h3>
-          </div>
-          
-          <CardContent className="p-4">
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="doableWeight" className="block text-sm font-medium mb-1">Doable Weight</Label>
-                <div className="flex items-center">
-                  <Input
-                    id="doableWeight"
-                    type="number"
-                    value={taskLevelWeights.doableWeight}
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    className="w-24"
-                    onChange={(e) => handleTaskWeightChange('doableWeight', e.target.value)}
-                  />
-                  <span className="ml-2">%</span>
-                  <div className="ml-4 text-sm text-muted-foreground">
-                    If "Yes" = full score, "No" = 0 points
-                  </div>
-                </div>
+          <div className="space-y-6">
+            {/* Task Score Configuration */}
+            <Card className="overflow-hidden">
+              <div className="p-4 bg-primary bg-opacity-5 border-b border-gray-200">
+                <h3 className="font-medium text-lg text-primary">Task Level Scoring</h3>
               </div>
               
-              <div>
-                <Label htmlFor="usabilityWeight" className="block text-sm font-medium mb-1">Usability & Interaction Weight</Label>
-                <div className="flex items-center">
-                  <Input
-                    id="usabilityWeight"
-                    type="number"
-                    value={taskLevelWeights.usabilityWeight}
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    className="w-24"
-                    onChange={(e) => handleTaskWeightChange('usabilityWeight', e.target.value)}
-                  />
-                  <span className="ml-2">%</span>
-                </div>
-              </div>
-              
-              <div>
-                <Label htmlFor="visualsWeight" className="block text-sm font-medium mb-1">Visuals Weight</Label>
-                <div className="flex items-center">
-                  <Input
-                    id="visualsWeight"
-                    type="number"
-                    value={taskLevelWeights.visualsWeight}
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    className="w-24"
-                    onChange={(e) => handleTaskWeightChange('visualsWeight', e.target.value)}
-                  />
-                  <span className="ml-2">%</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-6 flex justify-end">
-              <Button
-                onClick={handleSaveTaskConfig}
-                disabled={!taskWeightsChanged || updateTaskWeights.isPending}
-              >
-                {updateTaskWeights.isPending ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Saving...
-                  </>
-                ) : "Save Changes"}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Category Score Configuration */}
-        <Card className="overflow-hidden">
-          <div className="p-4 bg-primary bg-opacity-5 border-b border-gray-200">
-            <h3 className="font-medium text-lg text-primary">Category Level Scoring</h3>
-          </div>
-          
-          <CardContent className="p-4">
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="taskAvgWeight" className="block text-sm font-medium mb-1">Task Average Weight</Label>
-                <div className="flex items-center">
-                  <Input
-                    id="taskAvgWeight"
-                    type="number"
-                    value={categoryLevelWeights.taskAvgWeight}
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    className="w-24"
-                    onChange={(e) => handleCategoryWeightChange('taskAvgWeight', e.target.value)}
-                  />
-                  <span className="ml-2">%</span>
-                  <div className="ml-4 text-sm text-muted-foreground">
-                    Average of all task scores in the category
-                  </div>
-                </div>
-              </div>
-              
-              <div>
-                <Label htmlFor="responsivenessWeight" className="block text-sm font-medium mb-1">System Feedback & Responsiveness Weight</Label>
-                <div className="flex items-center">
-                  <Input
-                    id="responsivenessWeight"
-                    type="number"
-                    value={categoryLevelWeights.responsivenessWeight}
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    className="w-24"
-                    onChange={(e) => handleCategoryWeightChange('responsivenessWeight', e.target.value)}
-                  />
-                  <span className="ml-2">%</span>
-                </div>
-              </div>
-              
-              <div>
-                <Label htmlFor="writingWeight" className="block text-sm font-medium mb-1">Writing Weight</Label>
-                <div className="flex items-center">
-                  <Input
-                    id="writingWeight"
-                    type="number"
-                    value={categoryLevelWeights.writingWeight}
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    className="w-24"
-                    onChange={(e) => handleCategoryWeightChange('writingWeight', e.target.value)}
-                  />
-                  <span className="ml-2">%</span>
-                </div>
-              </div>
-              
-              <div>
-                <Label htmlFor="emotionalWeight" className="block text-sm font-medium mb-1">Emotional Weight (Bonus)</Label>
-                <div className="flex items-center">
-                  <Input
-                    id="emotionalWeight"
-                    type="number"
-                    value={categoryLevelWeights.emotionalWeight}
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    className="w-24"
-                    onChange={(e) => handleCategoryWeightChange('emotionalWeight', e.target.value)}
-                  />
-                  <span className="ml-2">%</span>
-                  <div className="ml-4 text-sm text-muted-foreground">
-                    Bonus points that won't decrease the score
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-6 flex justify-end">
-              <Button
-                onClick={handleSaveCategoryConfig}
-                disabled={!categoryWeightsChanged || updateCategoryWeights.isPending}
-              >
-                {updateCategoryWeights.isPending ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Saving...
-                  </>
-                ) : "Save Changes"}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* CUJ Data Management */}
-        <Card className="overflow-hidden">
-          <div className="p-4 bg-primary bg-opacity-5 border-b border-gray-200">
-            <h3 className="font-medium text-lg text-primary">CUJ Data Management</h3>
-          </div>
-          
-          <CardContent className="p-4">
-            <div className="mb-4">
-              <p className="text-muted-foreground">Update the master CUJ data from external source.</p>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div>
-                {cujSyncStatus && (
-                  <>
-                    <div className="text-sm text-muted-foreground">
-                      Last updated: {formatDateTime(cujSyncStatus.lastSync)}
+              <CardContent className="p-4">
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="doableWeight" className="block text-sm font-medium mb-1">Doable Weight</Label>
+                    <div className="flex items-center">
+                      <Input
+                        id="doableWeight"
+                        type="number"
+                        value={taskLevelWeights.doableWeight}
+                        min="0"
+                        max="100"
+                        step="0.01"
+                        className="w-24"
+                        onChange={(e) => handleTaskWeightChange('doableWeight', e.target.value)}
+                      />
+                      <span className="ml-2">%</span>
+                      <div className="ml-4 text-sm text-muted-foreground">
+                        If "Yes" = full score, "No" = 0 points
+                      </div>
                     </div>
-                    <div className={`text-sm ${cujSyncStatus.status === 'up_to_date' ? 'text-accent' : 'text-warning'} mt-1`}>
-                      {cujSyncStatus.status === 'up_to_date' 
-                        ? 'Data is up to date' 
-                        : 'Updates available'}
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="usabilityWeight" className="block text-sm font-medium mb-1">Usability & Interaction Weight</Label>
+                    <div className="flex items-center">
+                      <Input
+                        id="usabilityWeight"
+                        type="number"
+                        value={taskLevelWeights.usabilityWeight}
+                        min="0"
+                        max="100"
+                        step="0.01"
+                        className="w-24"
+                        onChange={(e) => handleTaskWeightChange('usabilityWeight', e.target.value)}
+                      />
+                      <span className="ml-2">%</span>
                     </div>
-                  </>
-                )}
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="visualsWeight" className="block text-sm font-medium mb-1">Visuals Weight</Label>
+                    <div className="flex items-center">
+                      <Input
+                        id="visualsWeight"
+                        type="number"
+                        value={taskLevelWeights.visualsWeight}
+                        min="0"
+                        max="100"
+                        step="0.01"
+                        className="w-24"
+                        onChange={(e) => handleTaskWeightChange('visualsWeight', e.target.value)}
+                      />
+                      <span className="ml-2">%</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-6 flex justify-end">
+                  <Button
+                    onClick={handleSaveTaskConfig}
+                    disabled={!taskWeightsChanged || updateTaskWeights.isPending}
+                  >
+                    {updateTaskWeights.isPending ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : "Save Changes"}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Category Score Configuration */}
+            <Card className="overflow-hidden">
+              <div className="p-4 bg-primary bg-opacity-5 border-b border-gray-200">
+                <h3 className="font-medium text-lg text-primary">Category Level Scoring</h3>
               </div>
-              <Button 
-                onClick={handleSyncCujData}
-                disabled={syncCujData.isPending}
-                className="flex items-center"
-              >
-                {syncCujData.isPending ? (
-                  <>
-                    <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-                    Syncing...
-                  </>
-                ) : (
-                  <>
-                    <RefreshCw className="mr-1 h-4 w-4" />
-                    Sync Now
-                  </>
-                )}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-      
+              
+              <CardContent className="p-4">
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="taskAvgWeight" className="block text-sm font-medium mb-1">Task Average Weight</Label>
+                    <div className="flex items-center">
+                      <Input
+                        id="taskAvgWeight"
+                        type="number"
+                        value={categoryLevelWeights.taskAvgWeight}
+                        min="0"
+                        max="100"
+                        step="0.01"
+                        className="w-24"
+                        onChange={(e) => handleCategoryWeightChange('taskAvgWeight', e.target.value)}
+                      />
+                      <span className="ml-2">%</span>
+                      <div className="ml-4 text-sm text-muted-foreground">
+                        Average of all task scores in the category
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="responsivenessWeight" className="block text-sm font-medium mb-1">System Feedback & Responsiveness Weight</Label>
+                    <div className="flex items-center">
+                      <Input
+                        id="responsivenessWeight"
+                        type="number"
+                        value={categoryLevelWeights.responsivenessWeight}
+                        min="0"
+                        max="100"
+                        step="0.01"
+                        className="w-24"
+                        onChange={(e) => handleCategoryWeightChange('responsivenessWeight', e.target.value)}
+                      />
+                      <span className="ml-2">%</span>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="writingWeight" className="block text-sm font-medium mb-1">Writing Weight</Label>
+                    <div className="flex items-center">
+                      <Input
+                        id="writingWeight"
+                        type="number"
+                        value={categoryLevelWeights.writingWeight}
+                        min="0"
+                        max="100"
+                        step="0.01"
+                        className="w-24"
+                        onChange={(e) => handleCategoryWeightChange('writingWeight', e.target.value)}
+                      />
+                      <span className="ml-2">%</span>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="emotionalWeight" className="block text-sm font-medium mb-1">Emotional Weight (Bonus)</Label>
+                    <div className="flex items-center">
+                      <Input
+                        id="emotionalWeight"
+                        type="number"
+                        value={categoryLevelWeights.emotionalWeight}
+                        min="0"
+                        max="100"
+                        step="0.01"
+                        className="w-24"
+                        onChange={(e) => handleCategoryWeightChange('emotionalWeight', e.target.value)}
+                      />
+                      <span className="ml-2">%</span>
+                      <div className="ml-4 text-sm text-muted-foreground">
+                        Bonus points that won't decrease the score
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-6 flex justify-end">
+                  <Button
+                    onClick={handleSaveCategoryConfig}
+                    disabled={!categoryWeightsChanged || updateCategoryWeights.isPending}
+                  >
+                    {updateCategoryWeights.isPending ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : "Save Changes"}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* CUJ Data Management */}
+            <Card className="overflow-hidden">
+              <div className="p-4 bg-primary bg-opacity-5 border-b border-gray-200">
+                <h3 className="font-medium text-lg text-primary">CUJ Data Management</h3>
+              </div>
+              
+              <CardContent className="p-4">
+                <div className="mb-4">
+                  <p className="text-muted-foreground">Update the master CUJ data from external source.</p>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    {cujSyncStatus && (
+                      <>
+                        <div className="text-sm text-muted-foreground">
+                          Last updated: {formatDateTime(cujSyncStatus.lastSync)}
+                        </div>
+                        <div className={`text-sm ${cujSyncStatus.status === 'up_to_date' ? 'text-accent' : 'text-warning'} mt-1`}>
+                          {cujSyncStatus.status === 'up_to_date' 
+                            ? 'Data is up to date' 
+                            : 'Updates available'}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  <Button 
+                    onClick={handleSyncCujData}
+                    disabled={syncCujData.isPending}
+                    className="flex items-center"
+                  >
+                    {syncCujData.isPending ? (
+                      <>
+                        <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                        Syncing...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="mr-1 h-4 w-4" />
+                        Sync Now
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
         
         <TabsContent value="data" className="mt-6">

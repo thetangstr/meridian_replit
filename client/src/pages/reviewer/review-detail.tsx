@@ -57,34 +57,42 @@ export default function ReviewDetail() {
   
   // Calculate progress
   const calculateProgress = () => {
-    if (!tasks) return { totalCompleted: 0, totalTasks: 0, progressPercentage: 0, categoriesProgress: [] };
+    if (!tasks || !categories) return { totalCompleted: 0, totalTasks: 0, progressPercentage: 0, categoriesProgress: [] };
     
     const { tasks: allTasks, completedTaskIds } = tasks;
     const totalCompleted = completedTaskIds.length;
     const totalTasks = allTasks.length;
     const progressPercentage = totalTasks === 0 ? 0 : (totalCompleted / totalTasks) * 100;
     
-    // Group tasks by category
-    const tasksByCategory = allTasks.reduce((acc, task) => {
-      const categoryId = task.cujId; // This would need to be adjusted based on the actual data structure
-      if (!acc[categoryId]) {
-        acc[categoryId] = { total: 0, completed: 0 };
-      }
-      acc[categoryId].total += 1;
-      if (completedTaskIds.includes(task.id)) {
-        acc[categoryId].completed += 1;
-      }
+    // Initialize category progress tracking
+    const categoryProgressMap = categories.reduce((acc, category) => {
+      acc[category.id] = { 
+        id: category.id, 
+        name: category.name, 
+        icon: category.icon || '', 
+        completedTasks: 0, 
+        totalTasks: 0 
+      };
       return acc;
-    }, {} as Record<number, { total: number, completed: number }>);
+    }, {} as Record<number, CategoryProgress>);
     
-    // Map to category progress
-    const categoriesProgress: CategoryProgress[] = categories?.map(category => ({
-      id: category.id,
-      name: category.name,
-      icon: category.icon,
-      completedTasks: tasksByCategory[category.id]?.completed || 0,
-      totalTasks: tasksByCategory[category.id]?.total || 0,
-    })) || [];
+    // Count tasks for each category
+    allTasks.forEach(task => {
+      // Get the category for this task through the CUJ
+      if (task.cuj && task.cuj.category && task.cuj.category.id) {
+        const categoryId = task.cuj.category.id;
+        if (categoryProgressMap[categoryId]) {
+          categoryProgressMap[categoryId].totalTasks += 1;
+          
+          if (completedTaskIds.includes(task.id)) {
+            categoryProgressMap[categoryId].completedTasks += 1;
+          }
+        }
+      }
+    });
+    
+    // Convert to array
+    const categoriesProgress = Object.values(categoryProgressMap);
     
     return { totalCompleted, totalTasks, progressPercentage, categoriesProgress };
   };
@@ -138,10 +146,17 @@ export default function ReviewDetail() {
   
   // Get category by CUJ ID
   const getCategoryByCujId = (cujId: number) => {
-    if (!categories) return null;
-    // This assumes cujId corresponds to a category id, which may not be the case
-    // You would need to adjust based on your actual data structure
-    return categories.find(cat => cat.id === cujId);
+    if (!categories || !tasks) return null;
+    
+    // Find the CUJ first from tasks
+    const cuj = tasks.tasks.find(task => task.cujId === cujId)?.cuj;
+    
+    // If we found a CUJ and it has a category, return that category
+    if (cuj && cuj.category) {
+      return cuj.category;
+    }
+    
+    return null;
   };
   
   // Render loading state
