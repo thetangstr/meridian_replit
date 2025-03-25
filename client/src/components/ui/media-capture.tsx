@@ -139,6 +139,8 @@ export function MediaCapture({
             videoPreviewRef.current.play()
               .catch(err => console.error("Error playing video stream:", err));
             setStreamActive(true);
+            // Set isCapturing to false to ensure buttons aren't disabled once stream is active
+            setIsCapturing(false);
           }
         };
       }
