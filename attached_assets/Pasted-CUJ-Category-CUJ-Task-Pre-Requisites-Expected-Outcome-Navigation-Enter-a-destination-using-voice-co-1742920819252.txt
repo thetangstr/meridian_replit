@@ -1,0 +1,133 @@
+CUJ_Category
+CUJ_Task
+Pre-Requisites
+Expected Outcome
+ Navigation
+Enter a destination using voice commands
+ Vehicle is on, Infotainment system is powered on, Microphone is enabled
+Navigation route is calculated and displayed on the map.
+ Navigation
+Start turn-by-turn navigation
+ Destination is entered, Route is calculated
+Clear and timely voice prompts and visual cues guide the driver along the route.
+ Navigation
+View alternative routes
+ Navigation is active, Multiple routes are available
+A list of alternative routes is displayed on the map with estimated time of arrival.
+ Navigation
+Add a waypoint to the current route
+ Navigation is active
+Waypoint is added to the route, and the route is recalculated.
+ Navigation
+Cancel current navigation
+ Navigation is active
+Navigation is stopped, and the map returns to a default view.
+ Media
+Connect smartphone via Bluetooth
+ Smartphone Bluetooth is enabled
+Smartphone is successfully paired and audio can be streamed.
+ Media
+Play music from connected smartphone
+ Smartphone is connected via Bluetooth or USB, Music app is open on the phone
+Audio playback from the smartphone begins through the car speakers.
+ Media
+Control music playback (play, pause, skip) using steering wheel controls
+ Music is playing from a connected device
+Music playback is controlled according to the steering wheel button pressed.
+ Media
+Browse music library on connected USB drive
+ USB drive with music files is connected
+A list of folders and music files on the USB drive is displayed on the infotainment screen.
+ Media
+Adjust audio equalizer settings
+ Audio is playing
+The sound output is modified according to the adjusted equalizer settings.
+ Communications
+Make a phone call using Bluetooth contacts
+ Smartphone is connected via Bluetooth, Contacts are synced
+The selected contact is called, and the call connects through the car speakers and microphone.
+ Communications
+Answer an incoming phone call
+ Smartphone is connected via Bluetooth, Incoming call notification is displayed
+The incoming call is answered and connected through the car speakers and microphone.
+ Communications
+End an ongoing phone call
+ A phone call is active
+The active phone call is disconnected.
+ Communications
+Send a pre-defined text message
+ Smartphone is connected via Bluetooth (if required by the system), Pre-defined messages are configured
+The selected pre-defined text message is sent.
+ Communications
+View recent call history
+ Smartphone is connected via Bluetooth (if required by the system)
+A list of recent incoming, outgoing, and missed calls is displayed.
+ Navigation
+Search for nearby Points of Interest (POI)
+ Vehicle is on, Infotainment system is powered on
+A list of nearby POIs matching the search criteria is displayed on the map.
+ Navigation
+Get directions to a selected POI
+ A POI is selected from the search results
+Navigation route to the selected POI is calculated and displayed.
+ Media
+Listen to FM/AM radio
+ Vehicle is on, Infotainment system is powered on
+Audio from the selected FM/AM radio station plays through the car speakers.
+ Media
+Scan for available radio stations
+ Radio is active
+A list of available FM/AM radio stations is displayed.
+ Communications
+Initiate a voice assistant command (e.g., "Hey [Car Brand]")
+ Vehicle is on, Infotainment system is powered on, Voice assistant is enabled
+The voice assistant is activated and ready to receive voice commands.
+ Communications
+Ask the voice assistant to make a call
+ Voice assistant is active, Contact name is provided
+The voice assistant attempts to initiate a call to the specified contact.
+ Navigation
+Receive and view traffic updates
+ Navigation is active, Traffic data is available
+Real-time traffic information is displayed on the navigation map, potentially with route adjustments.
+ Navigation
+Avoid toll roads on the navigation route
+ Navigation route is being calculated or is active
+The navigation route is recalculated to avoid toll roads.
+ Media
+Stream audio from a built-in music streaming service
+ Vehicle has a subscription to a built-in streaming service, Internet connectivity is available
+Audio playback from the selected streaming service begins.
+ Media
+Browse and search the catalog of the built-in streaming service
+ Built-in streaming service is active
+The user can explore the music library of the streaming service.
+ Communications
+Receive and view SMS messages
+ Smartphone is connected via Bluetooth (if required by the system), SMS access is granted
+New SMS messages are displayed on the infotainment screen.
+ Communications
+Reply to an SMS message using voice commands
+ An SMS message is open, Voice commands are enabled
+A reply message dictated by voice is sent.
+ General
+Adjust the infotainment system volume
+ Infotainment system is powered on
+The audio volume of the system is increased or decreased.
+ General
+Adjust the display brightness
+ Infotainment system display is active
+The brightness of the infotainment screen is adjusted.
+ General
+Navigate through the infotainment system menus
+ Infotainment system is powered on
+The user can access different features and settings of the system.
+ Navigation
+Download offline maps for a specific region
+ Infotainment system has storage capacity, Internet connectivity is available
+Offline map data for the selected region is downloaded and stored for use without internet.
+ Media
+Control playback of rear-seat entertainment (if available)
+ Rear-seat entertainment system is active and linked to the main infotainment
+Audio and/or video playback in the rear seats is controlled from the main infotainment unit.
+
