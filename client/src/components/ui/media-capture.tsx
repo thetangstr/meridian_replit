@@ -6,6 +6,27 @@ import { Camera as CameraIcon, Video, X, AlertCircle, Upload, RotateCcw } from "
 import { MediaItem } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 
+// Helper function to safely create an object URL
+const createSafeObjectURL = (data: any): string => {
+  try {
+    return URL.createObjectURL(data);
+  } catch (error) {
+    console.error('Error creating object URL:', error);
+    return '';
+  }
+};
+
+// Helper function to safely revoke an object URL
+const revokeSafeObjectURL = (url: string | undefined): void => {
+  if (url && url.startsWith('blob:')) {
+    try {
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error revoking object URL:', error);
+    }
+  }
+};
+
 interface MediaCaptureProps {
   media: MediaItem[];
   maxItems?: number;
@@ -232,13 +253,14 @@ export function MediaCapture({
       
       // Process the recorded chunks
       const videoBlob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
-      const tempVideoUrl = URL.createObjectURL(videoBlob);
+      const tempVideoUrl = createSafeObjectURL(videoBlob);
       
       // Create temporary media item
       const tempItem: MediaItem = {
         id: `temp-${Date.now()}`,
         type: 'video',
         url: tempVideoUrl,
+        // No thumbnailUrl for video temp items
         createdAt: new Date().toISOString()
       };
       
@@ -250,53 +272,70 @@ export function MediaCapture({
         description: "Uploading to server..."
       });
       
-      // Don't stop camera yet - we'll do that after successful upload
-      
       // Upload the video to the server
       const formData = new FormData();
       formData.append('file', videoBlob, `recording-${Date.now()}.webm`);
       
-      const response = await fetch('/api/media/upload', {
-        method: 'POST',
-        body: formData
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Upload failed: ${response.statusText}`);
+      try {
+        const response = await fetch('/api/media/upload', {
+          method: 'POST',
+          body: formData
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Upload failed: ${response.statusText}`);
+        }
+        
+        // Get the permanent media item from the server response
+        const mediaItem: MediaItem = await response.json();
+        
+        // Replace the temporary item with the permanent one
+        const updatedMedia = [...media];
+        const tempIndex = updatedMedia.length - 1; // Index of the item we just added
+        
+        // Safely revoke the temporary object URL
+        revokeSafeObjectURL(tempItem.url);
+        
+        // Update with the permanent media item
+        onChange([...updatedMedia.slice(0, tempIndex), mediaItem, ...updatedMedia.slice(tempIndex + 1)]);
+        
+        toast({
+          title: "Video captured",
+          description: "Video has been saved to the server."
+        });
+        
+        // Now we can safely stop the camera
+        stopCamera();
+      } catch (uploadError) {
+        console.error("Video upload error:", uploadError);
+        toast({
+          title: "Video upload failed",
+          description: "Failed to upload the video. Please try again.",
+          variant: "destructive"
+        });
+        
+        // Clean up the temporary item on error
+        const updatedMedia = media.filter(item => item.id !== tempItem.id);
+        onChange(updatedMedia);
+        
+        // Revoke the URL
+        revokeSafeObjectURL(tempItem.url);
+        
+        // Don't stop camera on error - let user try again
+        setIsRecording(false);
       }
-      
-      // Get the permanent media item from the server response
-      const mediaItem: MediaItem = await response.json();
-      
-      // Replace the temporary item with the permanent one
-      const updatedMedia = [...media];
-      const tempIndex = updatedMedia.length - 1; // Index of the item we just added
-      
-      // Revoke the temporary object URL
-      URL.revokeObjectURL(tempItem.url);
-      
-      // Update with the permanent media item
-      onChange([...updatedMedia.slice(0, tempIndex), mediaItem, ...updatedMedia.slice(tempIndex + 1)]);
-      
-      toast({
-        title: "Video captured",
-        description: "Video has been saved to the server."
-      });
-      
-      // Now we can safely stop the camera
-      stopCamera();
     } catch (error) {
       console.error("Video processing error:", error);
       toast({
         title: "Video processing failed",
-        description: "Failed to process or upload the video.",
+        description: "Failed to process the video. Please try again.",
         variant: "destructive"
       });
       
       // Don't stop camera on error - let user try again
       setIsRecording(false);
     } finally {
-      // Reset recorder and stream
+      // Reset recorder state
       recordedChunksRef.current = [];
       mediaRecorderRef.current = null;
       setIsLoading(false);
@@ -359,42 +398,55 @@ export function MediaCapture({
         description: "Uploading to server..."
       });
       
-      // Convert the base64 image to a blob for upload
-      const response = await fetch(photo);
-      const blob = await response.blob();
-      
-      // Upload the image to the server
-      const formData = new FormData();
-      formData.append('file', blob, `capture-${Date.now()}.jpg`);
-      
-      const uploadResponse = await fetch('/api/media/upload', {
-        method: 'POST',
-        body: formData
-      });
-      
-      if (!uploadResponse.ok) {
-        throw new Error(`Upload failed: ${uploadResponse.statusText}`);
+      try {
+        // Convert the base64 image to a blob for upload
+        const response = await fetch(photo);
+        const blob = await response.blob();
+        
+        // Upload the image to the server
+        const formData = new FormData();
+        formData.append('file', blob, `capture-${Date.now()}.jpg`);
+        
+        const uploadResponse = await fetch('/api/media/upload', {
+          method: 'POST',
+          body: formData
+        });
+        
+        if (!uploadResponse.ok) {
+          throw new Error(`Upload failed: ${uploadResponse.statusText}`);
+        }
+        
+        // Get the permanent media item from the server response
+        const mediaItem: MediaItem = await uploadResponse.json();
+        
+        // Replace the temporary item with the permanent one
+        const updatedMedia = [...media];
+        const tempIndex = updatedMedia.length - 1; // Index of the item we just added
+        
+        // Update with the permanent media item
+        onChange([...updatedMedia.slice(0, tempIndex), mediaItem, ...updatedMedia.slice(tempIndex + 1)]);
+        
+        toast({
+          title: "Image captured",
+          description: "Image has been saved to the server."
+        });
+      } catch (uploadError) {
+        console.error("Image upload error:", uploadError);
+        toast({
+          title: "Image upload failed",
+          description: "Failed to upload the image. Please try again.",
+          variant: "destructive"
+        });
+        
+        // Clean up the temporary item on error
+        const updatedMedia = media.filter(item => item.id !== tempItem.id);
+        onChange(updatedMedia);
       }
-      
-      // Get the permanent media item from the server response
-      const mediaItem: MediaItem = await uploadResponse.json();
-      
-      // Replace the temporary item with the permanent one
-      const updatedMedia = [...media];
-      const tempIndex = updatedMedia.length - 1; // Index of the item we just added
-      
-      // Update with the permanent media item
-      onChange([...updatedMedia.slice(0, tempIndex), mediaItem, ...updatedMedia.slice(tempIndex + 1)]);
-      
-      toast({
-        title: "Image captured",
-        description: "Image has been saved to the server."
-      });
     } catch (error) {
       console.error("Image capture error:", error);
       toast({
         title: "Failed to capture image",
-        description: "There was an error capturing or uploading the image.",
+        description: "There was an error capturing the image.",
         variant: "destructive"
       });
     } finally {
@@ -748,43 +800,87 @@ export function MediaCapture({
             <Card key={item.id} className="overflow-hidden">
               <CardContent className="p-2 relative">
                 {item.type === 'image' ? (
-                  <img 
-                    src={item.url} 
-                    alt={`Captured ${index + 1}`} 
-                    className="w-full aspect-square object-cover rounded-md"
-                    onError={(e) => {
-                      // Retry loading with full URL if relative path fails
-                      const imgElement = e.currentTarget;
-                      if (!imgElement.src.startsWith('http') && !imgElement.src.startsWith('blob:') && !imgElement.src.startsWith('data:')) {
-                        imgElement.src = window.location.origin + imgElement.src;
-                      }
-                    }}
-                  />
+                  <div className="relative w-full aspect-square rounded-md bg-gray-100">
+                    <img 
+                      src={item.thumbnailUrl || item.url} 
+                      alt={`Captured ${index + 1}`} 
+                      className="w-full h-full object-cover rounded-md"
+                      onError={(e) => {
+                        const imgElement = e.currentTarget;
+                        // First try: If not a full URL, add origin
+                        if (!imgElement.src.startsWith('http') && !imgElement.src.startsWith('blob:') && !imgElement.src.startsWith('data:')) {
+                          imgElement.src = window.location.origin + imgElement.src;
+                        } 
+                        // Second try: If thumbnailUrl failed, try the main URL
+                        else if (item.thumbnailUrl && imgElement.src === item.thumbnailUrl) {
+                          imgElement.src = item.url;
+                        }
+                        // Final fallback: Show error state
+                        else {
+                          imgElement.style.display = 'none';
+                          const parent = imgElement.parentElement;
+                          if (parent) {
+                            const errorDiv = document.createElement('div');
+                            errorDiv.className = 'absolute inset-0 flex items-center justify-center bg-gray-200 rounded-md';
+                            errorDiv.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>';
+                            parent.appendChild(errorDiv);
+                          }
+                        }
+                      }}
+                    />
+                  </div>
                 ) : (
-                  <div className="relative bg-black rounded-md aspect-video flex items-center justify-center">
+                  <div className="relative bg-black rounded-md aspect-video flex items-center justify-center overflow-hidden">
+                    {/* Video thumbnail overlay (shown until play) */}
+                    <div className="absolute inset-0 bg-gray-900 flex items-center justify-center">
+                      <Video className="h-12 w-12 text-white opacity-70" />
+                    </div>
+                    
                     <video 
                       src={item.url} 
                       className="w-full h-full object-contain"
                       controls
-                      poster={item.thumbnailUrl || undefined}
-                      onError={(e) => {
-                        // Retry loading with full URL if relative path fails
+                      preload="metadata"
+                      poster={item.thumbnailUrl}
+                      onLoadedData={(e) => {
+                        // When video is loaded, hide the thumbnail overlay
                         const videoElement = e.currentTarget;
+                        const parent = videoElement.parentElement;
+                        if (parent) {
+                          const overlay = parent.querySelector('div.absolute');
+                          if (overlay) {
+                            overlay.style.opacity = '0';
+                            overlay.style.pointerEvents = 'none';
+                          }
+                        }
+                      }}
+                      onError={(e) => {
+                        const videoElement = e.currentTarget;
+                        // First try: add origin if not a full URL
                         if (!videoElement.src.startsWith('http') && !videoElement.src.startsWith('blob:') && !videoElement.src.startsWith('data:')) {
                           videoElement.src = window.location.origin + videoElement.src;
+                        } 
+                        // Final fallback: Show error state
+                        else {
+                          videoElement.style.display = 'none';
+                          const parent = videoElement.parentElement;
+                          if (parent) {
+                            // Update the overlay to show error
+                            const overlay = parent.querySelector('div.absolute');
+                            if (overlay) {
+                              overlay.innerHTML = '<div class="text-white text-center p-2"><svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-white opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg><p class="text-xs mt-2">Video unavailable</p></div>';
+                            }
+                          }
                         }
                       }}
                     />
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                      <Video className="h-8 w-8 text-white opacity-50" />
-                    </div>
                   </div>
                 )}
                 
                 <Button 
                   variant="destructive" 
                   size="icon" 
-                  className="absolute -top-2 -right-2 h-6 w-6 rounded-full"
+                  className="absolute -top-2 -right-2 h-6 w-6 rounded-full shadow-md"
                   onClick={() => handleRemoveMedia(index)}
                 >
                   <X className="h-3 w-3" />
