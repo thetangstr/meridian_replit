@@ -487,6 +487,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Get all task evaluations for a review
+  app.get('/api/reviews/:reviewId/task-evaluations', isAuthenticated, async (req, res) => {
+    const reviewId = parseInt(req.params.reviewId);
+    
+    if (isNaN(reviewId)) {
+      return res.status(400).json({ error: 'Invalid review ID' });
+    }
+    
+    const review = await storage.getReview(reviewId);
+    if (!review) {
+      return res.status(404).json({ error: 'Review not found' });
+    }
+    
+    // Check if user has access to this review
+    if (req.user.role !== 'admin' && review.reviewerId !== req.user.id) {
+      return res.status(403).json({ error: 'You do not have permission to view this review' });
+    }
+    
+    try {
+      const taskEvaluations = await storage.getTaskEvaluationsForReview(reviewId);
+      res.json(taskEvaluations);
+    } catch (error) {
+      res.status(500).json({ error: String(error) });
+    }
+  });
+  
+  // Get all category evaluations for a review
+  app.get('/api/reviews/:reviewId/category-evaluations', isAuthenticated, async (req, res) => {
+    const reviewId = parseInt(req.params.reviewId);
+    
+    if (isNaN(reviewId)) {
+      return res.status(400).json({ error: 'Invalid review ID' });
+    }
+    
+    const review = await storage.getReview(reviewId);
+    if (!review) {
+      return res.status(404).json({ error: 'Review not found' });
+    }
+    
+    // Check if user has access to this review
+    if (req.user.role !== 'admin' && review.reviewerId !== req.user.id) {
+      return res.status(403).json({ error: 'You do not have permission to view this review' });
+    }
+    
+    try {
+      const categoryEvaluations = await storage.getCategoryEvaluationsForReview(reviewId);
+      res.json(categoryEvaluations);
+    } catch (error) {
+      res.status(500).json({ error: String(error) });
+    }
+  });
+  
   // Report routes
   app.get('/api/reports/:id', isAuthenticated, async (req, res) => {
     const reportId = parseInt(req.params.id);

@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, ChevronDown, ChevronRight, Navigation, Headphones, Phone, Settings, Check, X } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
-import { CujCategory, Task, Review, ReviewWithDetails, TaskEvaluation, Cuj } from "@shared/schema";
+import { CujCategory, Task, Review, ReviewWithDetails, TaskEvaluation, CategoryEvaluation, Cuj } from "@shared/schema";
 
 // Extend Task type to include cuj relationship
 type TaskWithCuj = Task & {
