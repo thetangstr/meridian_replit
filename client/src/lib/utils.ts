@@ -100,43 +100,38 @@ export function calculateTaskScore(
 ): number | null {
   if (!evaluation) return null;
   
-  // Use the exact weights provided by the user:
-  // Doable (Yes or No). Yes = 43.75%/43.75% of task score, No = 0%/43.75% of task score
-  // Usability & Interaction. 37.5% of overall score. Scaled between 1-4
-  // Visuals. 18.75% of overall score. Scaled between 1-4
+  // Normalize weights to ensure they sum to 100%
+  const totalWeight = weights.doable + weights.usability + weights.visuals;
+  const normalizedWeights = {
+    doable: weights.doable / totalWeight,
+    usability: weights.usability / totalWeight,
+    visuals: weights.visuals / totalWeight
+  };
   
   let score = 0;
-  let totalPossibleScore = 0;
+  let weightSum = 0;
   
-  // Doable is binary - full score or zero (43.75% of overall score)
+  // Doable is binary - full score or zero
   if (evaluation.doable !== undefined && evaluation.doable !== null) {
-    const doableValue = evaluation.doable ? weights.doable : 0;
-    score += doableValue;
-    totalPossibleScore += weights.doable;
+    score += (evaluation.doable ? 1 : 0) * normalizedWeights.doable * 4; // Scale to 0-4
+    weightSum += normalizedWeights.doable;
   }
   
-  // Usability (37.5% of overall score)
   if (evaluation.usabilityScore !== undefined && evaluation.usabilityScore !== null) {
-    // Convert the 1-4 score to a percentage of the total possible usability points
-    const usabilityValue = (evaluation.usabilityScore / 4) * weights.usability;
-    score += usabilityValue;
-    totalPossibleScore += weights.usability;
+    score += evaluation.usabilityScore * normalizedWeights.usability;
+    weightSum += normalizedWeights.usability;
   }
   
-  // Visuals (18.75% of overall score)
   if (evaluation.visualsScore !== undefined && evaluation.visualsScore !== null) {
-    // Convert the 1-4 score to a percentage of the total possible visuals points
-    const visualsValue = (evaluation.visualsScore / 4) * weights.visuals;
-    score += visualsValue;
-    totalPossibleScore += weights.visuals;
+    score += evaluation.visualsScore * normalizedWeights.visuals;
+    weightSum += normalizedWeights.visuals;
   }
   
   // If no scores were provided, return null
-  if (totalPossibleScore === 0) return null;
+  if (weightSum === 0) return null;
   
-  // Calculate the final score as a value between 0-4
-  const percentageScore = score / totalPossibleScore;
-  return percentageScore * 4;
+  // Normalize based on weights that were actually used
+  return score / weightSum;
 }
 
 // Calculate category evaluation score based on weights
@@ -152,49 +147,50 @@ export function calculateCategoryScore(
 ): number | null {
   if (!categoryEval && taskAvgScore === null) return null;
   
-  // Use the exact weights provided by the user:
-  // Task scores average: 80% of overall CUJ category score
-  // System Feedback & Responsiveness: 15% of overall score. Scaled between 1-4
-  // Writing: 5% of overall score. Scaled between 1-4
-  // Emotional: 5% bonus (can increase score beyond 4). Scaled between 1-4
+  // Normalize weights to ensure they sum to 100% (excluding emotional bonus)
+  const baseWeightSum = weights.tasks + weights.responsiveness + weights.writing;
+  const normalizedWeights = {
+    tasks: weights.tasks / baseWeightSum,
+    responsiveness: weights.responsiveness / baseWeightSum,
+    writing: weights.writing / baseWeightSum,
+    // Emotional is a bonus - not normalized
+    emotional: weights.emotional / 100
+  };
   
   let score = 0;
-  let totalPossibleScore = 0;
+  let weightSum = 0;
   
-  // Task average (80% of overall score)
+  // Task average
   if (taskAvgScore !== null) {
-    // Task scores are already on a 0-4 scale
-    score += (taskAvgScore / 4) * weights.tasks;
-    totalPossibleScore += weights.tasks;
+    score += taskAvgScore * normalizedWeights.tasks;
+    weightSum += normalizedWeights.tasks;
   }
   
-  // Responsiveness (15% of overall score)
+  // Responsiveness
   if (categoryEval?.responsivenessScore !== undefined && categoryEval.responsivenessScore !== null) {
-    score += (categoryEval.responsivenessScore / 4) * weights.responsiveness;
-    totalPossibleScore += weights.responsiveness;
+    score += categoryEval.responsivenessScore * normalizedWeights.responsiveness;
+    weightSum += normalizedWeights.responsiveness;
   }
   
-  // Writing (5% of overall score)
+  // Writing
   if (categoryEval?.writingScore !== undefined && categoryEval.writingScore !== null) {
-    score += (categoryEval.writingScore / 4) * weights.writing;
-    totalPossibleScore += weights.writing;
+    score += categoryEval.writingScore * normalizedWeights.writing;
+    weightSum += normalizedWeights.writing;
   }
   
   // If no scores were provided, return null
-  if (totalPossibleScore === 0) return null;
+  if (weightSum === 0) return null;
   
-  // Calculate base score as a percentage of total possible score, then scale to 0-4
-  const baseScorePercent = score / totalPossibleScore;
-  let finalScore = baseScorePercent * 4;
+  // Calculate base score normalized by weights used
+  const baseScore = score / weightSum;
   
-  // Apply emotional bonus (never decreases score, can increase beyond 4.0)
+  // Apply emotional bonus (never decreases score)
   if (categoryEval?.emotionalScore !== undefined && categoryEval.emotionalScore !== null) {
-    // This is a direct bonus percentage that can push score above 4.0
-    const emotionalBonusPercent = (categoryEval.emotionalScore / 4) * (weights.emotional / 100);
-    finalScore += emotionalBonusPercent * 4;
+    const emotionalBonus = (categoryEval.emotionalScore / 4) * normalizedWeights.emotional * 4;
+    return baseScore + emotionalBonus;
   }
   
-  return finalScore;
+  return baseScore;
 }
 
 // Format a score as a fixed decimal
