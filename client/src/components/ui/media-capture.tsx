@@ -390,27 +390,32 @@ export function MediaCapture({
           const mediaRecorder = new MediaRecorder(stream, options);
           mediaRecorderRef.current = mediaRecorder;
           
-          // Set up data handling for future recording
-          // Only request data when the recording is stopped, not continuously
+          // Set up data handling to always collect chunks
           mediaRecorder.ondataavailable = (event) => {
+            console.log(`Data available: ${event.data?.size || 0} bytes`);
             if (event.data && event.data.size > 0) {
-              console.log(`Data available: ${event.data.size} bytes`);
               recordedChunksRef.current.push(event.data);
             }
           };
           
           // Handle recording stop event - this is triggered when stop() is called
           mediaRecorder.onstop = () => {
-            console.log("MediaRecorder stopped, processing video");
-            // Only process if we actually have some data and are in recording state
-            if (recordedChunksRef.current.length > 0 && isRecording) {
+            console.log("MediaRecorder stopped, processing video with", recordedChunksRef.current.length, "chunks");
+            if (recordedChunksRef.current.length > 0) {
+              // Process the video regardless of isRecording state
               processVideoRecording().catch(error => {
                 console.error("Error in video processing:", error);
                 setIsRecording(false);
               });
             } else {
-              console.log("MediaRecorder stopped but no data collected or not in recording state");
+              console.log("MediaRecorder stopped but no data collected");
               setIsRecording(false);
+              
+              toast({
+                title: "Recording failed",
+                description: "No video data was captured. Please try again.",
+                variant: "destructive"
+              });
             }
           };
           
@@ -617,16 +622,9 @@ export function MediaCapture({
         // Make sure recorded chunks are empty before starting a new recording
         recordedChunksRef.current = [];
         
-        // Start recording WITHOUT a timeslice parameter, but ensure we get data properly
-        mediaRecorderRef.current.start();
-        
-        // Add a dataavailable event listener to make sure we capture data
-        mediaRecorderRef.current.addEventListener('dataavailable', (event) => {
-          console.log(`Data available event fired with size: ${event.data?.size || 0} bytes`);
-          if (event.data && event.data.size > 0) {
-            recordedChunksRef.current.push(event.data);
-          }
-        });
+        // Start recording WITH a timeslice parameter of 1000ms (1 second)
+        // This ensures data is continuously saved during recording
+        mediaRecorderRef.current.start(1000);
         
         // Update UI state
         setIsRecording(true);
