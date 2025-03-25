@@ -360,8 +360,7 @@ export function MediaCapture({
           
           const response = await fetch('/api/media/upload', {
             method: 'POST',
-            body: formData,
-            credentials: 'include'
+            body: formData
           });
           
           if (!response.ok) {
@@ -502,8 +501,7 @@ export function MediaCapture({
           // Upload the file to the server
           const response = await fetch('/api/media/upload', {
             method: 'POST',
-            body: formData,
-            credentials: 'include'
+            body: formData
           });
           
           if (!response.ok) {
@@ -572,8 +570,7 @@ export function MediaCapture({
       // If it's a server item (has an ID not starting with 'temp-'), delete it from the server
       else if (item.id && !item.id.startsWith('temp-')) {
         const response = await fetch(`/api/media/${item.id}`, {
-          method: 'DELETE',
-          credentials: 'include'
+          method: 'DELETE'
         });
         
         if (!response.ok) {
