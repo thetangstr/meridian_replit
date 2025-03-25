@@ -18,7 +18,7 @@ type TaskWithCuj = Task & {
 };
 import { apiRequest } from "@/lib/queryClient";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getScoreColorClass } from "@/lib/utils";
+import { getScoreColorClass, getScoreTextColorClass } from "@/lib/utils";
 
 type CategoryProgress = {
   id: number;
@@ -177,6 +177,64 @@ export default function ReviewDetail() {
     return tasks?.completedTaskIds.includes(taskId) || false;
   };
   
+  // Calculate category score based on task evaluations
+  const calculateCategoryScore = (categoryId: number) => {
+    const categoryTasks = tasks.tasks.filter(task => getCategoryByCujId(task.cujId)?.id === categoryId);
+    const completedTasks = categoryTasks.filter(task => isTaskCompleted(task.id));
+    
+    if (completedTasks.length === 0) {
+      return null;
+    }
+    
+    let totalScore = 0;
+    let totalTasks = 0;
+    
+    completedTasks.forEach(task => {
+      const evaluation = taskEvaluations[task.id];
+      if (evaluation) {
+        // If the task is not doable, skip it
+        if (evaluation.doable === false) {
+          return;
+        }
+        
+        // Calculate average of usability and visuals scores
+        const taskScore = 
+          ((evaluation.usabilityScore || 0) + (evaluation.visualsScore || 0)) / 2;
+        
+        if (taskScore > 0) {
+          totalScore += taskScore;
+          totalTasks++;
+        }
+      }
+    });
+    
+    return totalTasks > 0 
+      ? parseFloat((totalScore / totalTasks).toFixed(1)) 
+      : null;
+  };
+  
+  // Calculate overall vehicle score across all categories
+  const calculateOverallScore = () => {
+    if (!categories || categories.length === 0) {
+      return 'N/A';
+    }
+    
+    let totalScore = 0;
+    let totalCategories = 0;
+    
+    categories.forEach(category => {
+      const score = calculateCategoryScore(category.id);
+      if (score !== null) {
+        totalScore += score;
+        totalCategories++;
+      }
+    });
+    
+    return totalCategories > 0 
+      ? parseFloat((totalScore / totalCategories).toFixed(1)) 
+      : 'N/A';
+  };
+  
   // Get category by CUJ ID
   const getCategoryByCujId = (cujId: number) => {
     if (!categories || !tasks) return null;
@@ -305,6 +363,52 @@ export default function ReviewDetail() {
                 <div className="text-sm text-muted-foreground">{cat.name}</div>
               </div>
             ))}
+          </div>
+        </CardContent>
+      </Card>
+      
+      {/* Overall Vehicle Score */}
+      <Card className="mb-6">
+        <CardContent className="p-4">
+          <h3 className="font-medium mb-4">Overall Vehicle Score</h3>
+          
+          <div className="flex flex-col sm:flex-row justify-between mb-6">
+            <div className="flex-1 text-center mb-4 sm:mb-0">
+              <div className="inline-flex items-center justify-center bg-primary/10 w-20 h-20 rounded-full mb-2">
+                <span className="text-3xl font-bold text-primary">
+                  {calculateOverallScore()}
+                </span>
+              </div>
+              <div className="text-sm font-medium">Overall Rating</div>
+            </div>
+            
+            <div className="flex-1">
+              <h4 className="text-sm font-medium mb-2">CUJ Category Scores</h4>
+              <div className="space-y-3">
+                {categories.map(category => {
+                  const score = calculateCategoryScore(category.id);
+                  return (
+                    <div key={category.id} className="flex items-center">
+                      <div className="w-6 h-6 mr-2 flex items-center justify-center">
+                        {getCategoryIcon(category.icon)}
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex justify-between mb-1">
+                          <span className="text-sm">{category.name}</span>
+                          <span className={`text-sm font-medium ${getScoreTextColorClass(score)}`}>
+                            {score ? score : 'N/A'}
+                          </span>
+                        </div>
+                        <Progress 
+                          value={score ? (score / 4) * 100 : 0} 
+                          className="h-1.5" 
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>
