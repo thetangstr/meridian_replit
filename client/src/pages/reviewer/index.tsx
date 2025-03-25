@@ -1,20 +1,61 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { PlusCircle } from "lucide-react";
-import { Review, ReviewWithDetails } from "@shared/schema";
-import { formatDateRange } from "@/lib/utils";
+import { PlusCircle, Info } from "lucide-react";
+import { Review, ReviewWithDetails, Car } from "@shared/schema";
+import { formatDateRange, formatShortDate } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CarSelectionDialog } from "@/components/dialogs/car-selection-dialog";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 export default function ReviewerDashboard() {
   const [_, setLocation] = useLocation();
   const { user } = useAuth();
+  const [isCarDialogOpen, setIsCarDialogOpen] = useState(false);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   
   const { data: reviews, isLoading, error } = useQuery<ReviewWithDetails[]>({
     queryKey: ['/api/reviews'],
+  });
+  
+  // Create new review mutation
+  const createReviewMutation = useMutation({
+    mutationFn: async (data: { carId: number }) => {
+      const today = new Date();
+      const endDate = new Date(today);
+      endDate.setDate(today.getDate() + 14); // Set due date 2 weeks from now
+      
+      return apiRequest('/api/reviews', {
+        method: 'POST',
+        body: JSON.stringify({
+          carId: data.carId,
+          reviewerId: user?.id,
+          startDate: today.toISOString(),
+          endDate: endDate.toISOString(),
+          status: 'pending'
+        }),
+      });
+    },
+    onSuccess: (newReview) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/reviews'] });
+      toast({
+        title: "Review created",
+        description: "New car review has been created successfully"
+      });
+      setLocation(`/reviews/${newReview.id}`);
+    },
+    onError: (error) => {
+      toast({
+        title: "Error creating review",
+        description: String(error),
+        variant: "destructive",
+      });
+    },
   });
   
   const handleStartReview = (reviewId: number) => {
@@ -22,59 +63,11 @@ export default function ReviewerDashboard() {
   };
   
   const handleNewReview = () => {
-    // In a real application, this would show a form to choose a car and set up a review
-    // For now, we'll simulate creating a new review with the API
-    
-    // Get the first car (for demo purposes)
-    fetch('/api/cars')
-      .then(res => res.json())
-      .then(cars => {
-        if (cars && cars.length > 0) {
-          // Create a new review for this car
-          const today = new Date();
-          const endDate = new Date(today);
-          endDate.setDate(today.getDate() + 14); // Set due date 2 weeks from now
-          
-          fetch('/api/reviews', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-            },
-            credentials: 'include', // Important: Include credentials for authentication
-            body: JSON.stringify({
-              carId: cars[0].id,
-              reviewerId: user?.id,
-              startDate: today.toISOString(),
-              endDate: endDate.toISOString(),
-              status: 'pending'
-            })
-          })
-          .then(async (res) => {
-            // Check if the response is successful
-            if (!res.ok) {
-              // Try to get the error message from the response
-              const errorData = await res.json().catch(() => null);
-              throw new Error(errorData?.error || `Error creating review: ${res.status}`);
-            }
-            return res.json();
-          })
-          .then(newReview => {
-            // Navigate to the new review
-            setLocation(`/reviews/${newReview.id}`);
-          })
-          .catch(err => {
-            console.error('Error creating review:', err);
-            alert(`Failed to create new review: ${err.message}`);
-          });
-        } else {
-          alert('No cars available to review. Please add cars first.');
-        }
-      })
-      .catch(err => {
-        console.error('Error fetching cars:', err);
-        alert('Failed to fetch cars. Please try again.');
-      });
+    setIsCarDialogOpen(true);
+  };
+  
+  const handleCarSelected = (car: Car) => {
+    createReviewMutation.mutate({ carId: car.id });
   };
   
   // Render loading state
@@ -181,8 +174,14 @@ export default function ReviewerDashboard() {
             const { text, bgColor, textColor } = getStatusDisplay(review.status);
             const buttonText = getButtonText(review.status);
             
+            // Check if review is past due date
+            const isPastDue = new Date(review.endDate) < new Date() && review.status !== 'completed';
+            
             return (
-              <Card key={review.id} className="border border-gray-200">
+              <Card 
+                key={review.id} 
+                className={`border ${isPastDue ? 'border-red-300' : 'border-gray-200'}`}
+              >
                 <CardContent className="p-4">
                   <div className="flex justify-between items-start">
                     <div>
@@ -201,9 +200,15 @@ export default function ReviewerDashboard() {
                   <div className="mt-4 flex justify-between items-center">
                     <div>
                       <p className="text-sm text-muted-foreground">Due Date:</p>
-                      <p className="text-sm font-medium">
+                      <p className={`text-sm font-medium ${isPastDue ? 'text-red-600' : ''}`}>
                         {formatDateRange(review.startDate, review.endDate)}
                       </p>
+                      
+                      {review.lastModifiedBy && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Last modified by {review.lastModifiedBy.name} on {formatShortDate(new Date(review.updatedAt))}
+                        </p>
+                      )}
                     </div>
                     <Button
                       onClick={() => handleStartReview(review.id)}
@@ -222,10 +227,25 @@ export default function ReviewerDashboard() {
               <p className="text-sm text-muted-foreground mt-1">
                 You don't have any reviews assigned to you yet.
               </p>
+              <Button 
+                onClick={handleNewReview}
+                className="mt-4"
+                variant="outline"
+              >
+                <PlusCircle className="mr-1 h-4 w-4" />
+                Create your first review
+              </Button>
             </CardContent>
           </Card>
         )}
       </div>
+      
+      {/* Car Selection Dialog */}
+      <CarSelectionDialog
+        open={isCarDialogOpen}
+        onOpenChange={setIsCarDialogOpen}
+        onCarSelected={handleCarSelected}
+      />
     </div>
   );
 }

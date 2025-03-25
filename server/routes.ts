@@ -175,6 +175,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(category);
   });
   
+  // Car routes
+  app.get('/api/cars', isAuthenticated, async (req, res) => {
+    try {
+      const cars = await storage.getAllCars();
+      res.json(cars);
+    } catch (error) {
+      res.status(500).json({ error: String(error) });
+    }
+  });
+  
+  app.get('/api/cars/:id', isAuthenticated, async (req, res) => {
+    const carId = parseInt(req.params.id);
+    if (isNaN(carId)) {
+      return res.status(400).json({ error: 'Invalid car ID' });
+    }
+    
+    try {
+      const car = await storage.getCar(carId);
+      if (!car) {
+        return res.status(404).json({ error: 'Car not found' });
+      }
+      res.json(car);
+    } catch (error) {
+      res.status(500).json({ error: String(error) });
+    }
+  });
+  
+  app.post('/api/cars', isAuthenticated, hasRole(['admin', 'reviewer']), async (req, res) => {
+    try {
+      const carData = insertCarSchema.parse(req.body);
+      const newCar = await storage.createCar(carData);
+      res.status(201).json(newCar);
+    } catch (error) {
+      res.status(400).json({ error: String(error) });
+    }
+  });
+
   // Tasks routes
   app.get('/api/tasks/:id', isAuthenticated, async (req, res) => {
     const taskId = parseInt(req.params.id);
