@@ -87,7 +87,7 @@ export default function AdminDashboard() {
   });
   
   // Set initial weights when data is loaded
-  useState(() => {
+  useEffect(() => {
     if (config) {
       setTaskLevelWeights({
         doableWeight: config.taskDoableWeight,
@@ -102,7 +102,7 @@ export default function AdminDashboard() {
         emotionalWeight: config.categoryEmotionalWeight
       });
     }
-  });
+  }, [config]);
   
   // Update task weights
   const updateTaskWeights = useMutation({
@@ -348,7 +348,7 @@ export default function AdminDashboard() {
                     ) : "Save Changes"}
                   </Button>
                 </div>
-          </CardContent>
+              </CardContent>
             </Card>
 
             {/* Category Score Configuration */}
