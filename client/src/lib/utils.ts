@@ -10,21 +10,19 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-// Function to get the score color class based on the score value (1-4)
+// Function to get the score color class based on the score value (0-100)
 export function getScoreColorClass(score: number | null | undefined): string {
   if (score === null || score === undefined) return "bg-gray-300";
   
-  switch (Math.round(score)) {
-    case 1:
-      return "bg-score-poor"; // Very poor - Red
-    case 2:
-      return "bg-score-fair"; // Fair/Somewhat poor - Yellow/Orange
-    case 3:
-      return "bg-score-good"; // Good - Light Green
-    case 4:
-      return "bg-score-excellent"; // Excellent - Dark Green
-    default:
-      return "bg-gray-300"; // Default for invalid scores
+  // New score threshold system (0-100 scale)
+  if (score >= 85) {
+    return "bg-score-excellent"; // Excellent - Dark Green
+  } else if (score >= 75) {
+    return "bg-score-good"; // Good - Light Green
+  } else if (score >= 65) {
+    return "bg-score-fair"; // Fair/Somewhat poor - Yellow/Orange
+  } else {
+    return "bg-score-poor"; // Very poor - Red
   }
 }
 
@@ -32,17 +30,15 @@ export function getScoreColorClass(score: number | null | undefined): string {
 export function getScoreTextColorClass(score: number | null | undefined): string {
   if (score === null || score === undefined) return "text-gray-500";
   
-  switch (Math.round(score)) {
-    case 1:
-      return "text-score-poor"; // Very poor - Red
-    case 2:
-      return "text-score-fair"; // Fair - Yellow/Orange
-    case 3:
-      return "text-score-good"; // Good - Light Green
-    case 4:
-      return "text-score-excellent"; // Excellent - Dark Green
-    default:
-      return "text-gray-500"; // Default for invalid scores
+  // New score threshold system (0-100 scale)
+  if (score >= 85) {
+    return "text-score-excellent"; // Excellent - Dark Green
+  } else if (score >= 75) {
+    return "text-score-good"; // Good - Light Green
+  } else if (score >= 65) {
+    return "text-score-fair"; // Fair - Yellow/Orange
+  } else {
+    return "text-score-poor"; // Very poor - Red
   }
 }
 
@@ -95,49 +91,61 @@ export function getScoreDescription(score: number | null | undefined, type: keyo
 // Calculate task evaluation score based on weights
 export function calculateTaskScore(
   evaluation: Partial<TaskEvaluation> | null,
-  weights: { doable: number, usability: number, visuals: number }
+  weights?: { doable: number, usability: number, visuals: number }
 ): number | null {
   if (!evaluation) return null;
   
-  // Normalize weights to ensure they sum to 100%
-  const totalWeight = weights.doable + weights.usability + weights.visuals;
-  const normalizedWeights = {
-    doable: weights.doable / totalWeight,
-    usability: weights.usability / totalWeight,
-    visuals: weights.visuals / totalWeight
+  // Default weights based on requirements (as percentages)
+  // Doable: 43.75%, Usability: 37.5%, Visuals: 18.75%
+  const defaultWeights = {
+    doable: 43.75,
+    usability: 37.5,
+    visuals: 18.75
   };
   
+  // Use provided weights or defaults
+  const useWeights = weights || defaultWeights;
+  
+  // Ensure we have values to calculate with
+  if (evaluation.doable === undefined || evaluation.doable === null) {
+    return null;
+  }
+  
   let score = 0;
-  let weightSum = 0;
+  let maxPossibleScore = 100; // Scale to percentage (0-100)
   
-  // Doable is binary - full score or zero
-  if (evaluation.doable !== undefined && evaluation.doable !== null) {
-    score += (evaluation.doable ? 1 : 0) * normalizedWeights.doable * 4; // Scale to 0-4
-    weightSum += normalizedWeights.doable;
-  }
+  // Doable is binary - full score (43.75%) or zero
+  // Yes = 43.75%/43.75% of task score, No = 0%/43.75% of task score
+  score += (evaluation.doable ? useWeights.doable : 0);
   
+  // Usability & Interaction: 37.5% of task score, scaled between 1-4
   if (evaluation.usabilityScore !== undefined && evaluation.usabilityScore !== null) {
-    score += evaluation.usabilityScore * normalizedWeights.usability;
-    weightSum += normalizedWeights.usability;
+    // Convert 1-4 scale to percentage of the 37.5% weight
+    score += (evaluation.usabilityScore / 4) * useWeights.usability;
+  } else {
+    maxPossibleScore -= useWeights.usability;
   }
   
+  // Visuals: 18.75% of task score, scaled between 1-4
   if (evaluation.visualsScore !== undefined && evaluation.visualsScore !== null) {
-    score += evaluation.visualsScore * normalizedWeights.visuals;
-    weightSum += normalizedWeights.visuals;
+    // Convert 1-4 scale to percentage of the 18.75% weight
+    score += (evaluation.visualsScore / 4) * useWeights.visuals;
+  } else {
+    maxPossibleScore -= useWeights.visuals;
   }
   
-  // If no scores were provided, return null
-  if (weightSum === 0) return null;
+  // If we can't calculate a meaningful score, return null
+  if (maxPossibleScore === 0) return null;
   
-  // Normalize based on weights that were actually used
-  return score / weightSum;
+  // Return score as a percentage (0-100)
+  return parseFloat((score).toFixed(1));
 }
 
 // Calculate category evaluation score based on weights
 export function calculateCategoryScore(
   taskAvgScore: number | null,
   categoryEval: Partial<CategoryEvaluation> | null,
-  weights: { 
+  weights?: { 
     tasks: number, 
     responsiveness: number, 
     writing: number, 
@@ -146,50 +154,57 @@ export function calculateCategoryScore(
 ): number | null {
   if (!categoryEval && taskAvgScore === null) return null;
   
-  // Normalize weights to ensure they sum to 100% (excluding emotional bonus)
-  const baseWeightSum = weights.tasks + weights.responsiveness + weights.writing;
-  const normalizedWeights = {
-    tasks: weights.tasks / baseWeightSum,
-    responsiveness: weights.responsiveness / baseWeightSum,
-    writing: weights.writing / baseWeightSum,
-    // Emotional is a bonus - not normalized
-    emotional: weights.emotional / 100
+  // Default weights based on requirements (as percentages)
+  // Tasks: 80%, Responsiveness: 15%, Writing: 5%, Emotional: 5% (bonus)
+  const defaultWeights = {
+    tasks: 80,
+    responsiveness: 15,
+    writing: 5,
+    emotional: 5 // Bonus
   };
   
+  // Use provided weights or defaults
+  const useWeights = weights || defaultWeights;
+  
   let score = 0;
-  let weightSum = 0;
+  let maxPossibleScore = 100; // Scale to percentage (0-100)
   
-  // Task average
+  // Average of all task scores (80% of overall score)
   if (taskAvgScore !== null) {
-    score += taskAvgScore * normalizedWeights.tasks;
-    weightSum += normalizedWeights.tasks;
+    // Convert task score (0-100) to percentage of 80% weight
+    score += taskAvgScore * (useWeights.tasks / 100);
+  } else {
+    maxPossibleScore -= useWeights.tasks;
   }
   
-  // Responsiveness
+  // System Feedback & Responsiveness (15% of overall score)
   if (categoryEval?.responsivenessScore !== undefined && categoryEval.responsivenessScore !== null) {
-    score += categoryEval.responsivenessScore * normalizedWeights.responsiveness;
-    weightSum += normalizedWeights.responsiveness;
+    // Convert 1-4 scale to percentage of 15% weight
+    score += (categoryEval.responsivenessScore / 4) * useWeights.responsiveness;
+  } else {
+    maxPossibleScore -= useWeights.responsiveness;
   }
   
-  // Writing
+  // Writing (5% of overall score)
   if (categoryEval?.writingScore !== undefined && categoryEval.writingScore !== null) {
-    score += categoryEval.writingScore * normalizedWeights.writing;
-    weightSum += normalizedWeights.writing;
+    // Convert 1-4 scale to percentage of 5% weight
+    score += (categoryEval.writingScore / 4) * useWeights.writing;
+  } else {
+    maxPossibleScore -= useWeights.writing;
   }
   
-  // If no scores were provided, return null
-  if (weightSum === 0) return null;
+  // If we can't calculate a meaningful score, return null
+  if (maxPossibleScore === 0) return null;
   
-  // Calculate base score normalized by weights used
-  const baseScore = score / weightSum;
-  
-  // Apply emotional bonus (never decreases score)
+  // Emotional score is a bonus (5% overall score)
+  // Only add this if it exists, but don't reduce maxPossibleScore if missing
   if (categoryEval?.emotionalScore !== undefined && categoryEval.emotionalScore !== null) {
-    const emotionalBonus = (categoryEval.emotionalScore / 4) * normalizedWeights.emotional * 4;
-    return baseScore + emotionalBonus;
+    // Convert 1-4 scale to percentage of 5% weight
+    score += (categoryEval.emotionalScore / 4) * useWeights.emotional;
   }
   
-  return baseScore;
+  // Return score as a percentage (0-100)
+  return parseFloat(score.toFixed(1));
 }
 
 // Format a score as a fixed decimal

@@ -18,7 +18,7 @@ type TaskWithCuj = Task & {
 };
 import { apiRequest } from "@/lib/queryClient";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getScoreColorClass, getScoreTextColorClass } from "@/lib/utils";
+import { getScoreColorClass, getScoreTextColorClass, calculateTaskScore, calculateCategoryScore as utilsCalculateCategoryScore } from "@/lib/utils";
 
 type CategoryProgress = {
   id: number;
@@ -234,62 +234,26 @@ export default function ReviewDetail() {
       return null;
     }
     
-    // Calculate task average score
-    let taskAvgScore = 0;
-    let totalTasksWithScores = 0;
+    // Calculate average task scores using our utility function
+    let taskScoresSum = 0;
+    let taskScoresCount = 0;
     
     completedTasks.forEach(task => {
       const evaluation = taskEvaluations[task.id];
       if (evaluation) {
-        // If the task is not doable, skip it
-        if (evaluation.doable === false) {
-          return;
-        }
-        
-        // Calculate average of usability and visuals scores
-        const taskScore = 
-          ((evaluation.usabilityScore || 0) + (evaluation.visualsScore || 0)) / 2;
-        
-        if (taskScore > 0) {
-          taskAvgScore += taskScore;
-          totalTasksWithScores++;
+        const taskScore = calculateTaskScore(evaluation);
+        if (taskScore !== null) {
+          taskScoresSum += taskScore;
+          taskScoresCount++;
         }
       }
     });
     
-    // If we have tasks with scores, calculate their average
-    if (totalTasksWithScores > 0) {
-      taskAvgScore = taskAvgScore / totalTasksWithScores;
-    }
+    // Get average task score if any valid scores exist
+    const avgTaskScore = taskScoresCount > 0 ? taskScoresSum / taskScoresCount : null;
     
-    // If we have a category evaluation, calculate the combined score
-    if (categoryEvaluation) {
-      // Get the responsiveness, writing and emotional scores (default to 0 if undefined)
-      const responsivenessScore = categoryEvaluation.responsivenessScore || 0;
-      const writingScore = categoryEvaluation.writingScore || 0;
-      const emotionalScore = categoryEvaluation.emotionalScore || 0;
-      
-      // Weights for different components of the category score
-      // These should match the weights in the admin settings
-      const taskWeight = 0.5; // 50% weight to task average 
-      const responsivenessWeight = 0.25; // 25% weight to responsiveness
-      const writingWeight = 0.15; // 15% weight to writing
-      const emotionalWeight = 0.1; // 10% weight to emotional score (bonus)
-      
-      // Calculate weighted score
-      const weightedScore = 
-        (taskAvgScore * taskWeight) +
-        (responsivenessScore * responsivenessWeight) +
-        (writingScore * writingWeight) +
-        (emotionalScore * emotionalWeight);
-      
-      return parseFloat(weightedScore.toFixed(1));
-    }
-    
-    // If no category evaluation but we have task scores, return task average
-    return totalTasksWithScores > 0 
-      ? parseFloat(taskAvgScore.toFixed(1)) 
-      : null;
+    // Use our utility function to calculate the category score
+    return utilsCalculateCategoryScore(avgTaskScore, categoryEvaluation);
   };
   
   // Calculate overall vehicle score across all categories
@@ -479,7 +443,7 @@ export default function ReviewDetail() {
                           </span>
                         </div>
                         <Progress 
-                          value={score ? (score / 4) * 100 : 0} 
+                          value={score ? score : 0} 
                           className="h-1.5" 
                         />
                       </div>
@@ -588,13 +552,13 @@ export default function ReviewDetail() {
                               </div>
                               <div className="flex items-center space-x-1">
                                 <span className="text-xs text-muted-foreground">Usability:</span>
-                                <span className={`text-xs font-medium ${getScoreColorClass(taskEvaluations[task.id]?.usabilityScore)}`}>
+                                <span className={`text-xs font-medium ${getScoreColorClass(taskEvaluations[task.id]?.usabilityScore ? (taskEvaluations[task.id]?.usabilityScore / 4) * 100 : null)}`}>
                                   {taskEvaluations[task.id]?.usabilityScore ? `${taskEvaluations[task.id]?.usabilityScore}/4` : "N/A"}
                                 </span>
                               </div>
                               <div className="flex items-center space-x-1">
                                 <span className="text-xs text-muted-foreground">Visuals:</span>
-                                <span className={`text-xs font-medium ${getScoreColorClass(taskEvaluations[task.id]?.visualsScore)}`}>
+                                <span className={`text-xs font-medium ${getScoreColorClass(taskEvaluations[task.id]?.visualsScore ? (taskEvaluations[task.id]?.visualsScore / 4) * 100 : null)}`}>
                                   {taskEvaluations[task.id]?.visualsScore ? `${taskEvaluations[task.id]?.visualsScore}/4` : "N/A"}
                                 </span>
                               </div>
