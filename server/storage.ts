@@ -97,6 +97,18 @@ export interface IStorage {
   createReport(report: InsertReport): Promise<Report>;
   updateReport(id: number, report: Partial<InsertReport>): Promise<Report>;
   
+  // Media operations
+  saveMedia(file: {
+    filename: string;
+    originalName: string;
+    mimetype: string;
+    size: number;
+    type: 'image' | 'video';
+    userId: number;
+  }): Promise<MediaItem>;
+  getMediaItem(id: string): Promise<MediaItem | undefined>;
+  deleteMedia(id: string, userId: number): Promise<boolean>;
+  
   // CUJ Data Sync
   getCujSyncStatus(): Promise<{ lastSync: string, status: string }>;
   syncCujData(): Promise<{ success: boolean, message: string }>;
@@ -775,6 +787,51 @@ export class MemStorage implements IStorage {
       success: true,
       message: "CUJ data successfully synchronized"
     };
+  }
+  
+  // Media operations
+  private mediaItems: Map<string, MediaItem> = new Map();
+  
+  async saveMedia(file: {
+    filename: string;
+    originalName: string;
+    mimetype: string;
+    size: number;
+    type: 'image' | 'video';
+    userId: number;
+  }): Promise<MediaItem> {
+    const id = `media-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    const baseUrl = process.env.BASE_URL || `http://localhost:5000`;
+    const url = `${baseUrl}/uploads/${file.filename}`;
+    
+    // Create thumbnail URL for images (in a real implementation, this would generate a thumbnail)
+    const thumbnailUrl = file.type === 'image' ? url : undefined;
+    
+    const mediaItem: MediaItem = {
+      id,
+      type: file.type,
+      url,
+      thumbnailUrl,
+      createdAt: new Date().toISOString()
+    };
+    
+    this.mediaItems.set(id, mediaItem);
+    return mediaItem;
+  }
+  
+  async getMediaItem(id: string): Promise<MediaItem | undefined> {
+    return this.mediaItems.get(id);
+  }
+  
+  async deleteMedia(id: string, userId: number): Promise<boolean> {
+    const item = this.mediaItems.get(id);
+    if (!item) {
+      return false;
+    }
+    
+    // In a real implementation, this would delete the file from storage
+    this.mediaItems.delete(id);
+    return true;
   }
 }
 
