@@ -46,6 +46,9 @@ export default function TaskEvaluationPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   
+  // Reference for transition animation
+  const nodeRef = useRef(null);
+  
   const [submitting, setSubmitting] = useState(false);
   
   // Fetch task details
@@ -265,7 +268,6 @@ export default function TaskEvaluationPage() {
 
   // Create a unique key for the task to use with the transition
   const taskKey = `task-${taskId}`;
-  const nodeRef = useRef(null);
 
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-20 sm:pb-6">
