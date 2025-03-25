@@ -1,13 +1,24 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation, useParams } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ChevronDown, ChevronRight, Navigation, Headphones, Phone, Settings } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronRight, Navigation, Headphones, Phone, Settings, Check, X } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
-import { CujCategory, Task, Review, ReviewWithDetails } from "@shared/schema";
+import { CujCategory, Task, Review, ReviewWithDetails, TaskEvaluation, Cuj } from "@shared/schema";
+
+// Extend Task type to include cuj relationship
+type TaskWithCuj = Task & {
+  cuj?: {
+    id: number;
+    name: string;
+    categoryId: number;
+    category?: CujCategory;
+  };
+};
 import { apiRequest } from "@/lib/queryClient";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getScoreColorClass } from "@/lib/utils";
 
 type CategoryProgress = {
   id: number;
@@ -26,6 +37,9 @@ export default function ReviewDetail() {
   // Track expanded categories
   const [expandedCategories, setExpandedCategories] = useState<number[]>([]);
   
+  // Store task evaluations data
+  const [taskEvaluations, setTaskEvaluations] = useState<Record<number, TaskEvaluation>>({});
+  
   // Fetch review details
   const { data: review, isLoading: isLoadingReview } = useQuery<ReviewWithDetails>({
     queryKey: [`/api/reviews/${reviewId}`],
@@ -37,12 +51,29 @@ export default function ReviewDetail() {
   });
   
   // Fetch tasks with their completion status
-  const { data: tasks, isLoading: isLoadingTasks } = useQuery<{ tasks: Task[], completedTaskIds: number[] }>({
+  const { data: tasks, isLoading: isLoadingTasks } = useQuery<{ tasks: TaskWithCuj[], completedTaskIds: number[] }>({
     queryKey: [`/api/reviews/${reviewId}/tasks`],
   });
   
+  // Fetch task evaluations for this review
+  const { data: taskEvaluationsData, isLoading: isLoadingTaskEvals } = useQuery<TaskEvaluation[]>({
+    queryKey: [`/api/reviews/${reviewId}/task-evaluations`],
+    enabled: !!reviewId && !!tasks && Array.isArray(tasks.completedTaskIds) && tasks.completedTaskIds.length > 0,
+  });
+  
+  // Process task evaluations when data is loaded
+  useEffect(() => {
+    if (taskEvaluationsData && taskEvaluationsData.length > 0) {
+      const taskEvalsMap: Record<number, TaskEvaluation> = {};
+      taskEvaluationsData.forEach(taskEval => {
+        taskEvalsMap[taskEval.taskId] = taskEval;
+      });
+      setTaskEvaluations(taskEvalsMap);
+    }
+  }, [taskEvaluationsData]);
+  
   // Loading states
-  const isLoading = isLoadingReview || isLoadingCategories || isLoadingTasks;
+  const isLoading = isLoadingReview || isLoadingCategories || isLoadingTasks || isLoadingTaskEvals;
   
   // Update review status mutation
   const updateReviewStatus = useMutation({
@@ -126,7 +157,9 @@ export default function ReviewDetail() {
   };
   
   // Get icon component for category
-  const getCategoryIcon = (iconName: string) => {
+  const getCategoryIcon = (iconName: string | null) => {
+    if (!iconName) return <Settings className="text-primary mr-2" />;
+    
     switch (iconName) {
       case 'navigation':
         return <Navigation className="text-primary mr-2" />;
@@ -288,61 +321,105 @@ export default function ReviewDetail() {
               
               {isExpanded && (
                 <div className="border-t border-gray-200">
-                  {categoryTasks.map(task => (
-                    <div key={task.id} className="p-4 border-b border-gray-200 hover:bg-gray-50">
-                      <div className="flex justify-between">
-                        <div>
-                          <h4 className="font-medium">{task.name}</h4>
-                          {task.prerequisites && (
-                            <p className="text-sm text-muted-foreground mt-1">
-                              Prerequisites: {task.prerequisites}
-                            </p>
-                          )}
+                  <div className="p-3 bg-gray-50 border-b border-gray-200">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-semibold text-sm">Tasks ({completedCount}/{categoryTasks.length})</h4>
+                      <div className="text-xs text-muted-foreground">
+                        Each task requires ratings for: Doable (Yes/No), Usability (1-4), Visuals (1-4)
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {categoryTasks.length === 0 ? (
+                    <div className="p-4 text-center text-muted-foreground">
+                      No tasks found for this category
+                    </div>
+                  ) : (
+                    categoryTasks.map(task => (
+                      <div key={task.id} className="p-4 border-b border-gray-200 hover:bg-gray-50">
+                        <div className="flex justify-between">
+                          <div className="flex-1">
+                            <h4 className="font-medium">{task.name}</h4>
+                            {task.prerequisites && (
+                              <p className="text-sm text-muted-foreground mt-1">
+                                <span className="font-medium">Prerequisites:</span> {task.prerequisites}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex items-center space-x-2 ml-4">
+                            {isTaskCompleted(task.id) ? (
+                              <div className="flex items-center space-x-1">
+                                <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
+                                  <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                  </svg>
+                                </div>
+                                <span className="text-xs text-muted-foreground">Completed</span>
+                              </div>
+                            ) : (
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                className="text-primary border-primary"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEvaluateTask(task.id);
+                                }}
+                              >
+                                Evaluate Task
+                              </Button>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex items-center">
-                          {isTaskCompleted(task.id) ? (
-                            <div className="w-6 h-6 rounded-full bg-accent flex items-center justify-center">
-                              <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                              </svg>
+                        <div className="mt-2">
+                          <p className="text-sm font-medium">Expected Outcome:</p>
+                          <p className="text-sm text-muted-foreground">{task.expectedOutcome}</p>
+                        </div>
+                        {isTaskCompleted(task.id) && (
+                          <div className="mt-3 flex justify-between items-center">
+                            <div className="flex space-x-4">
+                              <div className="flex items-center space-x-1">
+                                <span className="text-xs text-muted-foreground">Doable:</span>
+                                <span className="text-xs font-medium">
+                                  {taskEvaluations[task.id]?.doable === true ? (
+                                    <span className="text-green-600">Yes</span>
+                                  ) : taskEvaluations[task.id]?.doable === false ? (
+                                    <span className="text-red-600">No</span>
+                                  ) : "N/A"}
+                                </span>
+                              </div>
+                              <div className="flex items-center space-x-1">
+                                <span className="text-xs text-muted-foreground">Usability:</span>
+                                <span className={`text-xs font-medium ${getScoreColorClass(taskEvaluations[task.id]?.usabilityScore)}`}>
+                                  {taskEvaluations[task.id]?.usabilityScore ? `${taskEvaluations[task.id]?.usabilityScore}/4` : "N/A"}
+                                </span>
+                              </div>
+                              <div className="flex items-center space-x-1">
+                                <span className="text-xs text-muted-foreground">Visuals:</span>
+                                <span className={`text-xs font-medium ${getScoreColorClass(taskEvaluations[task.id]?.visualsScore)}`}>
+                                  {taskEvaluations[task.id]?.visualsScore ? `${taskEvaluations[task.id]?.visualsScore}/4` : "N/A"}
+                                </span>
+                              </div>
                             </div>
-                          ) : (
                             <Button 
-                              variant="outline" 
-                              size="sm"
-                              className="text-primary border-primary rounded-full"
+                              variant="ghost" 
+                              size="sm" 
+                              className="text-primary"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleEvaluateTask(task.id);
                               }}
                             >
-                              Evaluate
+                              <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                              View/Edit Evaluation
                             </Button>
-                          )}
-                        </div>
+                          </div>
+                        )}
                       </div>
-                      <div className="mt-2">
-                        <p className="text-sm font-medium">Expected Outcome:</p>
-                        <p className="text-sm text-muted-foreground">{task.expectedOutcome}</p>
-                      </div>
-                      {isTaskCompleted(task.id) && (
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="mt-3 text-primary p-0"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleEvaluateTask(task.id);
-                          }}
-                        >
-                          <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                          </svg>
-                          View Evaluation
-                        </Button>
-                      )}
-                    </div>
-                  ))}
+                    ))
+                  )}
                   
                   {/* Category Evaluation Button */}
                   <div className="p-4 flex justify-center border-b border-gray-200">
@@ -352,8 +429,9 @@ export default function ReviewDetail() {
                         e.stopPropagation();
                         handleEvaluateCategory(category.id);
                       }}
+                      className="bg-primary text-primary-foreground hover:bg-primary/90"
                     >
-                      Evaluate Category Overall
+                      Evaluate {category.name} Category Overall
                     </Button>
                   </div>
                 </div>
