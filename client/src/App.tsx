@@ -74,47 +74,59 @@ function Router() {
   }, [loading, isAuthenticated, location, setLocation]);
   
   // If not authenticated and not on login page, show a temporary loading state
-  if (!isAuthenticated && location !== '/login') {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mx-auto mb-4"></div>
-          <div>Redirecting to login...</div>
+          <div>Loading...</div>
         </div>
       </div>
     );
   }
   
+  // Render content with or without the authenticated layout
+  // Login page should not have the authenticated layout
+  // Everything else should be wrapped with the AuthenticatedLayout component
+  
   return (
     <Switch>
+      {/* Public routes */}
       <Route path="/login" component={(props) => <AuthRoute component={Login} {...props} />} />
       
-      {/* Reviewer routes */}
-      <Route path="/" component={(props) => 
-        <PrivateRoute component={ReviewerDashboard} roles={["reviewer", "admin"]} {...props} />
-      } />
-      <Route path="/reviews/:id" component={(props) => 
-        <PrivateRoute component={ReviewDetail} roles={["reviewer", "admin"]} {...props} />
-      } />
-      <Route path="/reviews/:reviewId/tasks/:taskId" component={(props) => 
-        <PrivateRoute component={TaskEvaluation} roles={["reviewer", "admin"]} {...props} />
-      } />
-      <Route path="/reviews/:reviewId/categories/:categoryId" component={(props) => 
-        <PrivateRoute component={CategoryEvaluation} roles={["reviewer", "admin"]} {...props} />
-      } />
-      
-      {/* Report routes - available to all authenticated users */}
-      <Route path="/reports/:id" component={(props) => 
-        <PrivateRoute component={ReportView} {...props} />
-      } />
-      
-      {/* Admin routes */}
-      <Route path="/admin" component={(props) => 
-        <PrivateRoute component={AdminDashboard} roles={["admin"]} {...props} />
-      } />
-      
-      {/* Fallback to 404 */}
-      <Route component={NotFound} />
+      {/* All authenticated routes wrapped in AuthenticatedLayout */}
+      <Route>
+        <AuthenticatedLayout>
+          <Switch>
+            {/* Reviewer routes */}
+            <Route path="/" component={(props) => 
+              <PrivateRoute component={ReviewerDashboard} roles={["reviewer", "admin"]} {...props} />
+            } />
+            <Route path="/reviews/:id" component={(props) => 
+              <PrivateRoute component={ReviewDetail} roles={["reviewer", "admin"]} {...props} />
+            } />
+            <Route path="/reviews/:reviewId/tasks/:taskId" component={(props) => 
+              <PrivateRoute component={TaskEvaluation} roles={["reviewer", "admin"]} {...props} />
+            } />
+            <Route path="/reviews/:reviewId/categories/:categoryId" component={(props) => 
+              <PrivateRoute component={CategoryEvaluation} roles={["reviewer", "admin"]} {...props} />
+            } />
+            
+            {/* Report routes - available to all authenticated users */}
+            <Route path="/reports/:id" component={(props) => 
+              <PrivateRoute component={ReportView} {...props} />
+            } />
+            
+            {/* Admin routes */}
+            <Route path="/admin" component={(props) => 
+              <PrivateRoute component={AdminDashboard} roles={["admin"]} {...props} />
+            } />
+            
+            {/* Fallback to 404 */}
+            <Route component={NotFound} />
+          </Switch>
+        </AuthenticatedLayout>
+      </Route>
     </Switch>
   );
 }
@@ -122,26 +134,11 @@ function Router() {
 function App() {
   // Add basic error handling
   try {
-    // Get current pathname
-    const pathname = window.location.pathname;
-    
-    console.log("Current pathname:", pathname);
-    
-    // Skip AuthenticatedLayout for login page
-    if (pathname === "/login") {
-      return (
-        <QueryClientProvider client={queryClient}>
-          <Login />
-          <Toaster />
-        </QueryClientProvider>
-      );
-    }
-    
+    // We need to always render the Router component to handle auth state and routing
+    // The AuthenticatedLayout will only be shown for protected routes
     return (
       <QueryClientProvider client={queryClient}>
-        <AuthenticatedLayout>
-          <Router />
-        </AuthenticatedLayout>
+        <Router />
         <Toaster />
       </QueryClientProvider>
     );

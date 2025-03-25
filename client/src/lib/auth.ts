@@ -86,12 +86,16 @@ export const useAuth = create<AuthState>((set) => ({
   checkAuth: async () => {
     set({ loading: true });
     try {
+      console.log('Checking authentication status...');
       const res = await fetch('/api/auth/me', {
         credentials: 'include',
       });
       
+      console.log('Authentication check response:', res.status);
+      
       if (!res.ok) {
         if (res.status === 401) {
+          console.log('Not authenticated (401)');
           set({ isAuthenticated: false, user: null, loading: false });
           return;
         }
@@ -99,8 +103,10 @@ export const useAuth = create<AuthState>((set) => ({
       }
       
       const user = await res.json();
+      console.log('User authenticated:', user);
       set({ isAuthenticated: true, user, loading: false });
     } catch (error) {
+      console.error('Authentication check error:', error);
       set({ 
         isAuthenticated: false, 
         user: null, 
