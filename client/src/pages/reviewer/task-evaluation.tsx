@@ -148,13 +148,10 @@ export default function TaskEvaluationPage() {
           className: "bg-green-100 text-green-900 border-green-500 border font-medium",
         });
         
-        // Add a transition effect before navigation
-        document.body.classList.add('page-transition-out');
-        
-        // Encode the category ID so the review page knows which category to expand
+        // Navigate to the next task after a small delay
         setTimeout(() => {
           setLocation(`/reviews/${reviewId}/tasks/${nextTask.id}?category=${nextTask.cuj?.categoryId || ''}`);
-        }, 1200); // Increased delay to accommodate transition
+        }, 300);
       } else {
         toast({
           title: "🎉 Category Complete!",
@@ -163,13 +160,10 @@ export default function TaskEvaluationPage() {
           className: "bg-blue-100 text-blue-900 border-blue-500 border font-medium",
         });
         
-        // Add a transition effect before navigation
-        document.body.classList.add('page-transition-out');
-        
         // Return to review page with the current category expanded
         setTimeout(() => {
           setLocation(`/reviews/${reviewId}${currentCategoryId ? `?expandCategory=${currentCategoryId}` : ''}`);
-        }, 1200); // Increased delay to accommodate transition
+        }, 300);
       }
     },
     onError: (error) => {
@@ -269,6 +263,10 @@ export default function TaskEvaluationPage() {
     );
   }
 
+  // Create a unique key for the task to use with the transition
+  const taskKey = `task-${taskId}`;
+  const nodeRef = useRef(null);
+
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-20 sm:pb-6">
       <div className="flex items-center mb-6">
@@ -278,240 +276,251 @@ export default function TaskEvaluationPage() {
         <h2 className="text-xl font-medium text-foreground">Task Evaluation</h2>
       </div>
       
-      <Card className="mb-6">
-        <CardContent className="p-4">
-          <h3 className="font-medium text-lg">{task.name}</h3>
-          <div className="text-sm text-muted-foreground mt-2">
-            {task.prerequisites && (
-              <p><span className="font-medium">Prerequisites:</span> {task.prerequisites}</p>
-            )}
-            <p className="mt-1"><span className="font-medium">Expected Outcome:</span> {task.expectedOutcome}</p>
-          </div>
-          
-          {/* Task progress indicator */}
-          {tasksData && tasksData.tasks && task.cuj?.categoryId && (
-            <div className="mt-4 pt-4 border-t border-gray-200">
-              <div className="flex justify-between items-center mb-2">
-                <h4 className="text-sm font-medium">Category Progress</h4>
-                {(() => {
-                  const categoryTasks = tasksData.tasks.filter(t => 
-                    t.cuj?.categoryId === task.cuj?.categoryId
-                  );
-                  const completedCount = categoryTasks.filter(t => 
-                    tasksData.completedTaskIds.includes(t.id)
-                  ).length;
-                  const totalCount = categoryTasks.length;
-                  const currentPosition = categoryTasks.findIndex(t => t.id === task.id) + 1;
-                  
-                  return (
-                    <span className="text-xs text-muted-foreground">
-                      Task {currentPosition} of {totalCount} in {task.cuj?.category?.name || "this category"}
-                    </span>
-                  );
-                })()}
-              </div>
-              
-              {(() => {
-                const categoryTasks = tasksData.tasks.filter(t => 
-                  t.cuj?.categoryId === task.cuj?.categoryId
-                );
-                const completedCount = categoryTasks.filter(t => 
-                  tasksData.completedTaskIds.includes(t.id)
-                ).length;
-                const totalCount = categoryTasks.length;
-                const progress = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
+      <TransitionGroup component={null}>
+        <CSSTransition
+          key={taskKey}
+          nodeRef={nodeRef}
+          timeout={300}
+          classNames="task-slide"
+        >
+          <div ref={nodeRef}>
+            <Card className="mb-6">
+              <CardContent className="p-4">
+                <h3 className="font-medium text-lg">{task.name}</h3>
+                <div className="text-sm text-muted-foreground mt-2">
+                  {task.prerequisites && (
+                    <p><span className="font-medium">Prerequisites:</span> {task.prerequisites}</p>
+                  )}
+                  <p className="mt-1"><span className="font-medium">Expected Outcome:</span> {task.expectedOutcome}</p>
+                </div>
                 
-                return <Progress value={progress} className="h-2" />;
-              })()}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-      
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-          {/* Doable Question */}
-          <Card>
-            <CardContent className="p-4">
-              <h4 className="font-medium">Task Doable</h4>
-              <p className="text-sm text-muted-foreground mb-4">
-                Was the task able to be completed as expected?
-              </p>
-              
-              <FormField
-                control={form.control}
-                name="doable"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormControl>
-                      <RadioGroup 
-                        onValueChange={(value) => field.onChange(value === 'true')} 
-                        defaultValue={field.value ? 'true' : 'false'}
-                        className="flex space-x-4"
-                      >
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="true" id="doable-yes" />
-                          <label htmlFor="doable-yes">Yes</label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="false" id="doable-no" />
-                          <label htmlFor="doable-no">No</label>
-                        </div>
-                      </RadioGroup>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
+                {/* Task progress indicator */}
+                {tasksData && tasksData.tasks && task.cuj?.categoryId && (
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    <div className="flex justify-between items-center mb-2">
+                      <h4 className="text-sm font-medium">Category Progress</h4>
+                      {(() => {
+                        const categoryTasks = tasksData.tasks.filter(t => 
+                          t.cuj?.categoryId === task.cuj?.categoryId
+                        );
+                        const completedCount = categoryTasks.filter(t => 
+                          tasksData.completedTaskIds.includes(t.id)
+                        ).length;
+                        const totalCount = categoryTasks.length;
+                        const currentPosition = categoryTasks.findIndex(t => t.id === task.id) + 1;
+                        
+                        return (
+                          <span className="text-xs text-muted-foreground">
+                            Task {currentPosition} of {totalCount} in {task.cuj?.category?.name || "this category"}
+                          </span>
+                        );
+                      })()}
+                    </div>
+                    
+                    {(() => {
+                      const categoryTasks = tasksData.tasks.filter(t => 
+                        t.cuj?.categoryId === task.cuj?.categoryId
+                      );
+                      const completedCount = categoryTasks.filter(t => 
+                        tasksData.completedTaskIds.includes(t.id)
+                      ).length;
+                      const totalCount = categoryTasks.length;
+                      const progress = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
+                      
+                      return <Progress value={progress} className="h-2" />;
+                    })()}
+                  </div>
                 )}
-              />
-            </CardContent>
-          </Card>
-          
-          {/* Usability Question */}
-          <Card>
-            <CardContent className="p-4">
-              <h4 className="font-medium">Usability & Interaction</h4>
-              <p className="text-sm text-muted-foreground mb-4">
-                Rate how easy and intuitive it was to complete this task.
-              </p>
-              
-              <FormField
-                control={form.control}
-                name="usabilityScore"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormControl>
-                      <div className="flex flex-col space-y-8">
-                        <div className="grid grid-cols-4 w-full">
-                          {Object.entries(scoringScaleDescriptions.usability).map(([value, { label }]) => (
-                            <div key={value} className="flex flex-col items-center justify-center">
-                              <span className="font-medium text-sm">{label}</span>
-                              <span className="text-xs">{value}</span>
-                            </div>
-                          ))}
-                        </div>
-                        <RadioGroup 
-                          onValueChange={(value) => field.onChange(Number(value))} 
-                          defaultValue={field.value?.toString()}
-                          className="grid grid-cols-4 w-full gap-4"
-                        >
-                          {Object.entries(scoringScaleDescriptions.usability).map(([value, { label, description }]) => (
-                            <div key={value} className="flex flex-col items-center justify-center">
-                              <div className="flex justify-center">
-                                <RadioGroupItem value={value} id={`usability-${value}`} 
-                                  className={`w-10 h-10 rounded-full border-2 ${
-                                    Number(value) === 1 ? 'border-score-poor bg-score-poor/20' : 
-                                    Number(value) === 2 ? 'border-score-fair bg-score-fair/20' : 
-                                    Number(value) === 3 ? 'border-score-good bg-score-good/20' : 
-                                    'border-score-excellent bg-score-excellent/20'
-                                  }`} 
-                                />
+              </CardContent>
+            </Card>
+            
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                {/* Doable Question */}
+                <Card>
+                  <CardContent className="p-4">
+                    <h4 className="font-medium">Task Doable</h4>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Was the task able to be completed as expected?
+                    </p>
+                    
+                    <FormField
+                      control={form.control}
+                      name="doable"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormControl>
+                            <RadioGroup 
+                              onValueChange={(value) => field.onChange(value === 'true')} 
+                              defaultValue={field.value ? 'true' : 'false'}
+                              className="flex space-x-4"
+                            >
+                              <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="true" id="doable-yes" />
+                                <label htmlFor="doable-yes">Yes</label>
                               </div>
-                              <div className="mt-2 text-center px-2">
-                                <p className="text-xs text-muted-foreground">{description}</p>
+                              <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="false" id="doable-no" />
+                                <label htmlFor="doable-no">No</label>
                               </div>
-                            </div>
-                          ))}
-                        </RadioGroup>
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </CardContent>
-          </Card>
-          
-          {/* Visuals Question */}
-          <Card>
-            <CardContent className="p-4">
-              <h4 className="font-medium">Visual Design</h4>
-              <p className="text-sm text-muted-foreground mb-4">
-                Rate the visual design and aesthetics of this feature.
-              </p>
-              
-              <FormField
-                control={form.control}
-                name="visualsScore"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormControl>
-                      <div className="flex flex-col space-y-8">
-                        <div className="grid grid-cols-4 w-full">
-                          {Object.entries(scoringScaleDescriptions.visuals).map(([value, { label }]) => (
-                            <div key={value} className="flex flex-col items-center justify-center">
-                              <span className="font-medium text-sm">{label}</span>
-                              <span className="text-xs">{value}</span>
-                            </div>
-                          ))}
-                        </div>
-                        <RadioGroup 
-                          onValueChange={(value) => field.onChange(Number(value))} 
-                          defaultValue={field.value?.toString()}
-                          className="grid grid-cols-4 w-full gap-4"
-                        >
-                          {Object.entries(scoringScaleDescriptions.visuals).map(([value, { label, description }]) => (
-                            <div key={value} className="flex flex-col items-center justify-center">
-                              <div className="flex justify-center">
-                                <RadioGroupItem value={value} id={`visuals-${value}`} 
-                                  className={`w-10 h-10 rounded-full border-2 ${
-                                    Number(value) === 1 ? 'border-score-poor bg-score-poor/20' : 
-                                    Number(value) === 2 ? 'border-score-fair bg-score-fair/20' : 
-                                    Number(value) === 3 ? 'border-score-good bg-score-good/20' : 
-                                    'border-score-excellent bg-score-excellent/20'
-                                  }`} 
-                                />
+                            </RadioGroup>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </CardContent>
+                </Card>
+                
+                {/* Usability Question */}
+                <Card>
+                  <CardContent className="p-4">
+                    <h4 className="font-medium">Usability & Interaction</h4>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Rate how easy and intuitive it was to complete this task.
+                    </p>
+                    
+                    <FormField
+                      control={form.control}
+                      name="usabilityScore"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormControl>
+                            <div className="flex flex-col space-y-8">
+                              <div className="grid grid-cols-4 w-full">
+                                {Object.entries(scoringScaleDescriptions.usability).map(([value, { label }]) => (
+                                  <div key={value} className="flex flex-col items-center justify-center">
+                                    <span className="font-medium text-sm">{label}</span>
+                                    <span className="text-xs">{value}</span>
+                                  </div>
+                                ))}
                               </div>
-                              <div className="mt-2 text-center px-2">
-                                <p className="text-xs text-muted-foreground">{description}</p>
-                              </div>
+                              <RadioGroup 
+                                onValueChange={(value) => field.onChange(Number(value))} 
+                                defaultValue={field.value?.toString()}
+                                className="grid grid-cols-4 w-full gap-4"
+                              >
+                                {Object.entries(scoringScaleDescriptions.usability).map(([value, { label, description }]) => (
+                                  <div key={value} className="flex flex-col items-center justify-center">
+                                    <div className="flex justify-center">
+                                      <RadioGroupItem value={value} id={`usability-${value}`} 
+                                        className={`w-10 h-10 rounded-full border-2 ${
+                                          Number(value) === 1 ? 'border-score-poor bg-score-poor/20' : 
+                                          Number(value) === 2 ? 'border-score-fair bg-score-fair/20' : 
+                                          Number(value) === 3 ? 'border-score-good bg-score-good/20' : 
+                                          'border-score-excellent bg-score-excellent/20'
+                                        }`} 
+                                      />
+                                    </div>
+                                    <div className="mt-2 text-center px-2">
+                                      <p className="text-xs text-muted-foreground">{description}</p>
+                                    </div>
+                                  </div>
+                                ))}
+                              </RadioGroup>
                             </div>
-                          ))}
-                        </RadioGroup>
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </CardContent>
-          </Card>
-          
-          {/* Media Capture */}
-          <FormField
-            control={form.control}
-            name="media"
-            render={({ field }) => (
-              <FormItem>
-                <FormControl>
-                  <MediaCapture
-                    media={field.value || []}
-                    onChange={field.onChange}
-                    maxItems={5}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          
-          <div className="flex justify-end space-x-3">
-            <Button 
-              type="button" 
-              variant="outline" 
-              onClick={handleSaveAsDraft}
-              disabled={submitting || saveDraft.isPending}
-            >
-              {saveDraft.isPending ? "Saving..." : "Save as Draft"}
-            </Button>
-            <Button 
-              type="submit" 
-              disabled={submitting || submitEvaluation.isPending}
-            >
-              {submitEvaluation.isPending ? "Submitting..." : "Submit Evaluation"}
-            </Button>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </CardContent>
+                </Card>
+                
+                {/* Visuals Question */}
+                <Card>
+                  <CardContent className="p-4">
+                    <h4 className="font-medium">Visual Design</h4>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Rate the visual design and aesthetics of this feature.
+                    </p>
+                    
+                    <FormField
+                      control={form.control}
+                      name="visualsScore"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormControl>
+                            <div className="flex flex-col space-y-8">
+                              <div className="grid grid-cols-4 w-full">
+                                {Object.entries(scoringScaleDescriptions.visuals).map(([value, { label }]) => (
+                                  <div key={value} className="flex flex-col items-center justify-center">
+                                    <span className="font-medium text-sm">{label}</span>
+                                    <span className="text-xs">{value}</span>
+                                  </div>
+                                ))}
+                              </div>
+                              <RadioGroup 
+                                onValueChange={(value) => field.onChange(Number(value))} 
+                                defaultValue={field.value?.toString()}
+                                className="grid grid-cols-4 w-full gap-4"
+                              >
+                                {Object.entries(scoringScaleDescriptions.visuals).map(([value, { label, description }]) => (
+                                  <div key={value} className="flex flex-col items-center justify-center">
+                                    <div className="flex justify-center">
+                                      <RadioGroupItem value={value} id={`visuals-${value}`} 
+                                        className={`w-10 h-10 rounded-full border-2 ${
+                                          Number(value) === 1 ? 'border-score-poor bg-score-poor/20' : 
+                                          Number(value) === 2 ? 'border-score-fair bg-score-fair/20' : 
+                                          Number(value) === 3 ? 'border-score-good bg-score-good/20' : 
+                                          'border-score-excellent bg-score-excellent/20'
+                                        }`} 
+                                      />
+                                    </div>
+                                    <div className="mt-2 text-center px-2">
+                                      <p className="text-xs text-muted-foreground">{description}</p>
+                                    </div>
+                                  </div>
+                                ))}
+                              </RadioGroup>
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </CardContent>
+                </Card>
+                
+                {/* Media Capture */}
+                <FormField
+                  control={form.control}
+                  name="media"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <MediaCapture
+                          media={field.value || []}
+                          onChange={field.onChange}
+                          maxItems={5}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <div className="flex justify-end space-x-3">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={handleSaveAsDraft}
+                    disabled={submitting || saveDraft.isPending}
+                  >
+                    {saveDraft.isPending ? "Saving..." : "Save as Draft"}
+                  </Button>
+                  <Button 
+                    type="submit" 
+                    disabled={submitting || submitEvaluation.isPending}
+                  >
+                    {submitEvaluation.isPending ? "Submitting..." : "Submit Evaluation"}
+                  </Button>
+                </div>
+              </form>
+            </Form>
           </div>
-        </form>
-      </Form>
+        </CSSTransition>
+      </TransitionGroup>
     </div>
   );
 }
