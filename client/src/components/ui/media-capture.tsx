@@ -40,6 +40,12 @@ export function MediaCapture({
   onChange,
   className
 }: MediaCaptureProps) {
+  // Helper function to format seconds into mm:ss format
+  const formatTime = (seconds: number): string => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
   const { toast } = useToast();
   const cameraRef = useRef<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
