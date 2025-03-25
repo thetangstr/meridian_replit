@@ -13,6 +13,7 @@ import CategoryEvaluation from "@/pages/reviewer/category-evaluation";
 import ReportView from "@/pages/reports/report";
 import AdminDashboard from "@/pages/admin";
 import MediaTestPage from "@/pages/media-test";
+import ColorTestPage from "@/pages/color-test";
 import AuthenticatedLayout from "@/components/layout/authenticated-layout";
 
 function PrivateRoute({ component: Component, roles, ...rest }: any) {
@@ -56,8 +57,13 @@ function Router() {
     const initAuth = async () => {
       await checkAuth();
       
-      // After checking auth, redirect to login if not authenticated
-      if (!isAuthenticated && location !== '/login' && location !== '/media-test' && !location.startsWith('/media-test/')) {
+      // After checking auth, redirect to login if not authenticated and not on a test page
+      if (!isAuthenticated && 
+          location !== '/login' && 
+          location !== '/media-test' && 
+          !location.startsWith('/media-test/') &&
+          location !== '/color-test' &&
+          !location.startsWith('/color-test/')) {
         console.log('Not authenticated, redirecting to login');
         setLocation('/login');
       }
@@ -68,7 +74,13 @@ function Router() {
   
   // Force redirect to login during initial load
   useEffect(() => {
-    if (loading === false && !isAuthenticated && location !== '/login' && location !== '/media-test' && !location.startsWith('/media-test/')) {
+    if (loading === false && 
+        !isAuthenticated && 
+        location !== '/login' && 
+        location !== '/media-test' && 
+        !location.startsWith('/media-test/') &&
+        location !== '/color-test' &&
+        !location.startsWith('/color-test/')) {
       console.log('Not authenticated (after load), redirecting to login');
       setLocation('/login');
     }
@@ -95,8 +107,9 @@ function Router() {
       {/* Public routes */}
       <Route path="/login" component={(props) => <AuthRoute component={Login} {...props} />} />
       
-      {/* Media Test route - fully public for test purposes */}
+      {/* Test routes - fully public for test purposes */}
       <Route path="/media-test" component={MediaTestPage} />
+      <Route path="/color-test" component={ColorTestPage} />
       
       {/* All authenticated routes wrapped in AuthenticatedLayout */}
       <Route>
