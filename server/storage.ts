@@ -1404,8 +1404,73 @@ export class MemStorage implements IStorage {
         expectedOutcome: "Audio and/or video playback in the rear seats is controlled from the main infotainment unit."
       });
       
-      // Update sync status
+      // Reset reviews as well since they reference tasks that have changed
+      this.reviews = new Map<number, Review>();
+      this.taskEvaluations = new Map<string, TaskEvaluation>();
+      this.categoryEvaluations = new Map<string, CategoryEvaluation>();
+      this.reports = new Map<number, Report>();
+      this.reviewIdCounter = 1;
+      
+      // Create new sample reviews that reference our updated CUJ data
       const now = new Date();
+      const oneWeekLater = new Date(now);
+      oneWeekLater.setDate(oneWeekLater.getDate() + 7);
+      
+      // Create an in-progress review
+      const review1 = await this.createReview({
+        carId: 1,
+        reviewerId: 2, // reviewer
+        status: "in_progress",
+        startDate: now.toISOString(),
+        endDate: oneWeekLater.toISOString()
+      });
+      
+      // Create a pending review
+      const review2 = await this.createReview({
+        carId: 2,
+        reviewerId: 2, // reviewer
+        status: "pending",
+        startDate: now.toISOString(),
+        endDate: oneWeekLater.toISOString()
+      });
+      
+      // Create sample task evaluations for the in-progress review
+      // Get a few navigation tasks and create evaluations for them
+      const navigationTasks = Array.from(this.tasks.values())
+        .filter(task => {
+          const cuj = this.cujs.get(task.cujId);
+          return cuj && this.cujCategories.get(cuj.categoryId)?.name === "Navigation";
+        })
+        .slice(0, 3); // Get first 3 navigation tasks
+      
+      // Create evaluations for these tasks
+      for (const task of navigationTasks) {
+        await this.createTaskEvaluation({
+          reviewId: review1.id,
+          taskId: task.id,
+          doable: true,
+          usabilityRating: 3,
+          visualsRating: 3,
+          notes: "Sample task evaluation for task: " + task.name
+        });
+      }
+      
+      // Create a sample category evaluation
+      const navCategory = Array.from(this.cujCategories.values())
+        .find(cat => cat.name === "Navigation");
+        
+      if (navCategory) {
+        await this.createCategoryEvaluation({
+          reviewId: review1.id,
+          categoryId: navCategory.id,
+          responsivenessRating: 3,
+          writingRating: 3,
+          emotionalRating: 4,
+          notes: "Sample category evaluation for Navigation"
+        });
+      }
+      
+      // Update sync status
       this.cujSyncData = {
         lastSync: now.toISOString(),
         status: "up_to_date"
@@ -1413,7 +1478,7 @@ export class MemStorage implements IStorage {
       
       return {
         success: true,
-        message: "CUJ data synced successfully. Added 12 CUJs and 32 tasks."
+        message: "CUJ data synced successfully. Added 12 CUJs and 32 tasks with sample evaluations."
       };
     } catch (err) {
       console.error("Error syncing CUJ data:", err);
