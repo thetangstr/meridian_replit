@@ -177,13 +177,11 @@ export function MediaCapture({
           processVideoRecording();
         };
         
-        // Start recording
-        mediaRecorder.start();
-        setIsRecording(true);
+        // Don't start recording automatically - wait for user to press record button
         
         toast({
-          title: "Recording video",
-          description: "Tap the stop button when finished.",
+          title: "Camera ready",
+          description: "Tap the red button to start recording.",
         });
       } else {
         throw new Error("MediaRecorder not supported in this browser");
@@ -212,6 +210,9 @@ export function MediaCapture({
         throw new Error("No video data recorded");
       }
       
+      // Set loading state
+      setIsLoading(true);
+      
       // Process the recorded chunks
       const videoBlob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
       const tempVideoUrl = URL.createObjectURL(videoBlob);
@@ -227,13 +228,12 @@ export function MediaCapture({
       // Add to media collection with the temporary item
       onChange([...media, tempItem]);
       
-      // Reset camera state
-      stopCamera();
-      
       toast({
         title: "Video captured",
         description: "Uploading to server..."
       });
+      
+      // Don't stop camera yet - we'll do that after successful upload
       
       // Upload the video to the server
       const formData = new FormData();
@@ -265,6 +265,9 @@ export function MediaCapture({
         title: "Video captured",
         description: "Video has been saved to the server."
       });
+      
+      // Now we can safely stop the camera
+      stopCamera();
     } catch (error) {
       console.error("Video processing error:", error);
       toast({
@@ -272,14 +275,30 @@ export function MediaCapture({
         description: "Failed to process or upload the video.",
         variant: "destructive"
       });
+      
+      // Don't stop camera on error - let user try again
+      setIsRecording(false);
     } finally {
       // Reset recorder and stream
       recordedChunksRef.current = [];
       mediaRecorderRef.current = null;
-      setIsRecording(false);
+      setIsLoading(false);
     }
   };
 
+  const startRecording = () => {
+    if (mediaRecorderRef.current && !isRecording) {
+      // Start recording with 100ms time slices to get data frequently
+      mediaRecorderRef.current.start(100);
+      setIsRecording(true);
+      
+      toast({
+        title: "Recording video",
+        description: "Tap the stop button when finished.",
+      });
+    }
+  };
+  
   const stopRecording = () => {
     if (isRecording && mediaRecorderRef.current) {
       mediaRecorderRef.current.stop();
@@ -620,7 +639,7 @@ export function MediaCapture({
           <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black to-transparent p-4 flex justify-center items-center">
             <button 
               className={`w-16 h-16 rounded-full flex items-center justify-center shadow-xl focus:outline-none ${isRecording ? 'bg-red-600' : 'bg-white'}`}
-              onClick={isRecording ? stopRecording : startVideoRecording}
+              onClick={isRecording ? stopRecording : startRecording}
               disabled={isLoading}
             >
               {isRecording ? (
