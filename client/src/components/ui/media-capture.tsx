@@ -614,20 +614,99 @@ export function MediaCapture({
     }
   };
 
+  // Function to run a test recording process
+  const testVideoRecording = async () => {
+    try {
+      console.log("===== TEST VIDEO RECORDING STARTED =====");
+      
+      // First get media stream
+      console.log("1. Requesting media stream...");
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: 320, height: 240 },
+        audio: true
+      });
+      console.log("Media stream acquired successfully");
+      
+      // Set up MediaRecorder
+      console.log("2. Creating MediaRecorder...");
+      const options = { mimeType: 'video/webm' };
+      const mediaRecorder = new MediaRecorder(stream, options);
+      console.log("MediaRecorder created with state:", mediaRecorder.state);
+      
+      // Set up data handling
+      const recordedChunks: Blob[] = [];
+      mediaRecorder.ondataavailable = (event) => {
+        console.log(`3. Data available event fired with size: ${event.data?.size || 0} bytes`);
+        if (event.data && event.data.size > 0) {
+          recordedChunks.push(event.data);
+          console.log("Added chunk, total chunks:", recordedChunks.length);
+        }
+      };
+      
+      // Set up stop handling
+      mediaRecorder.onstop = () => {
+        console.log("4. MediaRecorder stopped with", recordedChunks.length, "chunks");
+        if (recordedChunks.length > 0) {
+          console.log("Processing", recordedChunks.length, "chunks");
+          const blob = new Blob(recordedChunks, { type: 'video/webm' });
+          console.log("5. Created blob of size:", blob.size);
+          
+          // Clean up
+          stream.getTracks().forEach(track => track.stop());
+          console.log("6. All tracks stopped");
+        } else {
+          console.log("No chunks collected");
+        }
+        console.log("===== TEST VIDEO RECORDING COMPLETED =====");
+      };
+      
+      // Start recording with timeslice
+      console.log("Starting test recording...");
+      mediaRecorder.start(1000);
+      
+      // Wait 5 seconds
+      console.log("Waiting 5 seconds...");
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      
+      // Stop recording
+      console.log("Stopping test recording...");
+      mediaRecorder.stop();
+      
+    } catch (error) {
+      console.error("Test recording error:", error);
+    }
+  };
+
   const startRecording = () => {
     try {
+      // Only start if we have a valid recorder and we're not already recording
       if (mediaRecorderRef.current && !isRecording) {
-        console.log("Starting recording with MediaRecorder");
+        console.log(`Starting recording at ${new Date().toISOString()}`);
+        console.log("MediaRecorder state before start:", mediaRecorderRef.current.state);
         
-        // Make sure recorded chunks are empty before starting a new recording
+        // Clear any previous recordings
         recordedChunksRef.current = [];
         
-        // Start recording WITH a timeslice parameter of 1000ms (1 second)
-        // This ensures data is continuously saved during recording
-        mediaRecorderRef.current.start(1000);
+        // Start recording with a timeslice parameter that's smaller (250ms)
+        // to ensure we get chunks more frequently
+        mediaRecorderRef.current.start(250);
+        console.log("MediaRecorder state after start:", mediaRecorderRef.current.state);
         
         // Update UI state
         setIsRecording(true);
+        
+        // Add a safety timeout to ensure we get at least one dataavailable event
+        // if the recorder doesn't trigger it naturally
+        setTimeout(() => {
+          if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+            try {
+              console.log("Explicitly requesting data via timeout");
+              mediaRecorderRef.current.requestData();
+            } catch (err) {
+              console.warn("Error in safety timeout requestData:", err);
+            }
+          }
+        }, 1000);
         
         toast({
           title: "Recording video",
@@ -635,12 +714,24 @@ export function MediaCapture({
         });
       } else {
         console.warn("Can't start recording - MediaRecorder not ready or already recording");
+        
+        // If there's no recorder, try to reinitialize the camera
         if (!mediaRecorderRef.current) {
-          // Try to reinitialize video preview instead of auto-recording
+          console.log("No MediaRecorder found, reinitializing video preview");
+          toast({
+            title: "Preparing camera",
+            description: "Please wait...",
+          });
+          
           initializeVideoPreview().catch(error => {
             console.error("Failed to re-initialize video preview:", error);
-            // On critical error, close camera view
             setCameraMode(null);
+            
+            toast({
+              title: "Camera error",
+              description: "Could not initialize the camera. Please try again.",
+              variant: "destructive"
+            });
           });
         }
       }
@@ -1009,6 +1100,16 @@ export function MediaCapture({
 
   return (
     <div className={`space-y-4 ${className || ''}`}>
+      {/* Test button, hidden in production */}
+      {process.env.NODE_ENV === 'development' && cameraMode === null && (
+        <button
+          onClick={testVideoRecording}
+          className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded text-sm"
+        >
+          Run Test Recording
+        </button>
+      )}
+      
       {/* Hidden file inputs for fallback upload */}
       <input 
         type="file" 
