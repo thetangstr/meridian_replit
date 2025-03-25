@@ -1192,56 +1192,61 @@ export function MediaCapture({
       {/* Camera mode selection buttons */}
       {cameraMode === null && (
         <div className="grid grid-cols-2 gap-4">
+          <div className="col-span-2 flex justify-center mb-2">
+            <div className="bg-muted inline-flex rounded-lg p-1">
+              <Button
+                variant={uploadType === 'image' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setUploadType('image')}
+                className="relative px-3"
+              >
+                <CameraIcon className="h-4 w-4 mr-2" />
+                Photo
+              </Button>
+              <Button
+                variant={uploadType === 'video' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setUploadType('video')}
+                className="relative px-3"
+              >
+                <Video className="h-4 w-4 mr-2" />
+                Video
+              </Button>
+            </div>
+          </div>
+          
           <Button 
             variant="outline"
             size="lg"
             className="flex flex-col items-center justify-center h-24 py-2"
-            onClick={() => switchCameraMode('image')}
+            onClick={() => switchCameraMode(uploadType)}
             disabled={isLoading || media.length >= maxItems}
           >
             <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-1">
-              <CameraIcon className="h-6 w-6 text-primary" />
+              {uploadType === 'image' ? (
+                <CameraIcon className="h-6 w-6 text-primary" />
+              ) : (
+                <Video className="h-6 w-6 text-primary" />
+              )}
             </div>
-            <span className="text-sm font-medium">Take Photo</span>
+            <span className="text-sm font-medium">
+              {uploadType === 'image' ? 'Take Photo' : 'Record Video'}
+            </span>
           </Button>
           
           <Button 
             variant="outline"
             size="lg"
             className="flex flex-col items-center justify-center h-24 py-2"
-            onClick={() => switchCameraMode('video')}
-            disabled={isLoading || media.length >= maxItems}
-          >
-            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-1">
-              <Video className="h-6 w-6 text-primary" />
-            </div>
-            <span className="text-sm font-medium">Record Video</span>
-          </Button>
-          
-          <Button 
-            variant="outline"
-            size="lg"
-            className="flex flex-col items-center justify-center h-24 py-2"
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => uploadType === 'image' ? fileInputRef.current?.click() : videoInputRef.current?.click()}
             disabled={isLoading || media.length >= maxItems}
           >
             <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-1">
               <Upload className="h-6 w-6 text-primary" />
             </div>
-            <span className="text-sm font-medium">Upload Photo</span>
-          </Button>
-          
-          <Button 
-            variant="outline"
-            size="lg"
-            className="flex flex-col items-center justify-center h-24 py-2"
-            onClick={() => videoInputRef.current?.click()}
-            disabled={isLoading || media.length >= maxItems}
-          >
-            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-1">
-              <Upload className="h-6 w-6 text-primary" />
-            </div>
-            <span className="text-sm font-medium">Upload Video</span>
+            <span className="text-sm font-medium">
+              {uploadType === 'image' ? 'Upload Photo' : 'Upload Video'}
+            </span>
           </Button>
         </div>
       )}
