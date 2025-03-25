@@ -733,10 +733,20 @@ export function MediaCapture({
           console.warn("Error requesting initial data:", reqErr);
         }
         
-        // Start recording with a very small timeslice parameter (100ms)
-        // to ensure we get chunks more frequently
-        mediaRecorderRef.current.start(100);
+        // Start recording with a slightly larger timeslice parameter (1000ms)
+        // to allow chunks to build up more substantially
+        console.log("STARTING RECORDING WITH TIMESLICE: 1000ms");
+        mediaRecorderRef.current.start(1000);
         console.log("MediaRecorder state after start:", mediaRecorderRef.current.state);
+        
+        // Log the tracks to verify what we're recording
+        if (mediaStreamRef.current) {
+          const tracks = mediaStreamRef.current.getTracks();
+          console.log("ACTIVE TRACKS IN STREAM:", tracks.length);
+          tracks.forEach((track, i) => {
+            console.log(`TRACK ${i}: kind=${track.kind}, enabled=${track.enabled}, readyState=${track.readyState}, id=${track.id}`);
+          });
+        }
         
         // Multiple safety timeouts to ensure we get data throughout recording
         const requestDataIntervals = [250, 500, 1000, 2000];
