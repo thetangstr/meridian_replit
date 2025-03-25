@@ -357,43 +357,45 @@ export class MemStorage implements IStorage {
     console.log(`Found ${allTasks.length} total tasks`);
     
     // Enhance each task with its CUJ and category information
-    const tasksWithCategories = await Promise.all(
-      allTasks.map(async (task) => {
-        const cuj = await this.getCuj(task.cujId);
-        let category = null;
-        
-        if (cuj) {
-          category = await this.getCujCategory(cuj.categoryId);
-          console.log(`Task ${task.id} (${task.name}) is linked to CUJ ${cuj.id} (${cuj.name}) and category ${category?.id} (${category?.name})`);
-        } else {
-          console.log(`Task ${task.id} (${task.name}) has CUJ ID ${task.cujId} but CUJ not found`);
-        }
-        
-        return {
-          ...task,
-          cuj: cuj ? {
-            ...cuj,
-            category: category || {
-              id: 0,
-              name: "Unknown",
-              description: null,
-              icon: null
-            }
-          } : {
+    const tasksWithCategories: TaskWithCategory[] = [];
+    
+    for (const task of allTasks) {
+      // Get the CUJ directly from the map instead of using the async method
+      const cuj = this.cujs.get(task.cujId);
+      let category = null;
+      
+      if (cuj) {
+        // Get the category directly from the map
+        category = this.cujCategories.get(cuj.categoryId);
+        console.log(`Task ${task.id} (${task.name}) is linked to CUJ ${cuj.id} (${cuj.name}) and category ${category?.id} (${category?.name})`);
+      } else {
+        console.log(`Task ${task.id} (${task.name}) has CUJ ID ${task.cujId} but CUJ not found`);
+      }
+      
+      tasksWithCategories.push({
+        ...task,
+        cuj: cuj ? {
+          ...cuj,
+          category: category || {
             id: 0,
             name: "Unknown",
             description: null,
-            categoryId: 0,
-            category: {
-              id: 0,
-              name: "Unknown",
-              description: null,
-              icon: null
-            }
+            icon: null
           }
-        } as TaskWithCategory;
-      })
-    );
+        } : {
+          id: 0,
+          name: "Unknown",
+          description: null,
+          categoryId: 0,
+          category: {
+            id: 0,
+            name: "Unknown",
+            description: null,
+            icon: null
+          }
+        }
+      } as TaskWithCategory);
+    }
     
     console.log(`Returning ${tasksWithCategories.length} tasks with categories`);
     return tasksWithCategories;
