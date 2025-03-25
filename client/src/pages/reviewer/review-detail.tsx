@@ -179,6 +179,10 @@ export default function ReviewDetail() {
   
   // Calculate category score based on task evaluations
   const calculateCategoryScore = (categoryId: number) => {
+    if (!tasks || !tasks.tasks) {
+      return null;
+    }
+    
     const categoryTasks = tasks.tasks.filter(task => getCategoryByCujId(task.cujId)?.id === categoryId);
     const completedTasks = categoryTasks.filter(task => isTaskCompleted(task.id));
     
@@ -237,7 +241,7 @@ export default function ReviewDetail() {
   
   // Get category by CUJ ID
   const getCategoryByCujId = (cujId: number) => {
-    if (!categories || !tasks) return null;
+    if (!categories || !tasks || !tasks.tasks) return null;
     
     // Find all tasks with this CUJ ID and check if any of them have the category info
     const tasksWithCuj = tasks.tasks.filter(task => task.cujId === cujId);
@@ -416,7 +420,7 @@ export default function ReviewDetail() {
       {/* CUJ Categories */}
       <div className="space-y-6">
         {categories.map(category => {
-          const categoryTasks = tasks.tasks.filter(task => getCategoryByCujId(task.cujId)?.id === category.id);
+          const categoryTasks = tasks?.tasks?.filter(task => getCategoryByCujId(task.cujId)?.id === category.id) || [];
           const completedCount = categoryTasks.filter(task => isTaskCompleted(task.id)).length;
           const isExpanded = expandedCategories.includes(category.id);
           
