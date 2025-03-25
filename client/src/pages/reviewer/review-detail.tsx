@@ -181,15 +181,30 @@ export default function ReviewDetail() {
   const getCategoryByCujId = (cujId: number) => {
     if (!categories || !tasks) return null;
     
-    // Find the CUJ first from tasks
-    const cuj = tasks.tasks.find(task => task.cujId === cujId)?.cuj;
+    // Find all tasks with this CUJ ID and check if any of them have the category info
+    const tasksWithCuj = tasks.tasks.filter(task => task.cujId === cujId);
     
-    // If we found a CUJ and it has a category, return that category
-    if (cuj && cuj.category) {
-      return cuj.category;
+    for (const task of tasksWithCuj) {
+      if (task.cuj && task.cuj.category) {
+        return task.cuj.category;
+      }
     }
     
-    return null;
+    // If we couldn't find a category through the tasks, 
+    // try finding one directly from the categories list by matching the CUJ
+    for (const category of categories) {
+      // If we have a task with this CUJ in this category, return the category
+      const taskInCategory = tasks.tasks.find(
+        task => task.cujId === cujId && task.cuj && task.cuj.category && task.cuj.category.id === category.id
+      );
+      
+      if (taskInCategory) {
+        return category;
+      }
+    }
+    
+    // If nothing else works, return the first category as a fallback
+    return categories.length > 0 ? categories[0] : null;
   };
   
   // Render loading state

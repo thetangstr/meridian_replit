@@ -354,6 +354,7 @@ export class MemStorage implements IStorage {
   async getTasksForReview(reviewId: number): Promise<TaskWithCategory[]> {
     // Get all tasks
     const allTasks = Array.from(this.tasks.values());
+    console.log(`Found ${allTasks.length} total tasks`);
     
     // Enhance each task with its CUJ and category information
     const tasksWithCategories = await Promise.all(
@@ -363,6 +364,9 @@ export class MemStorage implements IStorage {
         
         if (cuj) {
           category = await this.getCujCategory(cuj.categoryId);
+          console.log(`Task ${task.id} (${task.name}) is linked to CUJ ${cuj.id} (${cuj.name}) and category ${category?.id} (${category?.name})`);
+        } else {
+          console.log(`Task ${task.id} (${task.name}) has CUJ ID ${task.cujId} but CUJ not found`);
         }
         
         return {
@@ -391,6 +395,7 @@ export class MemStorage implements IStorage {
       })
     );
     
+    console.log(`Returning ${tasksWithCategories.length} tasks with categories`);
     return tasksWithCategories;
   }
   

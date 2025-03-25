@@ -48,11 +48,10 @@ export function getScoreTextColorClass(score: number | null | undefined): string
 
 // Format date range for display
 export function formatDateRange(startDate: string | Date, endDate: string | Date): string {
-  const start = new Date(startDate);
   const end = new Date(endDate);
   
-  // Format: "Mar 24 - Mar 30, 2025"
-  return `${formatShortDate(start)} - ${formatShortDate(end)}`;
+  // Now just show "Due Mar 30, 2025" instead of date range
+  return `Due ${formatShortDate(end)}`;
 }
 
 // Format short date

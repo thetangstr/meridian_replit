@@ -21,6 +21,52 @@ export default function ReviewerDashboard() {
     setLocation(`/reviews/${reviewId}`);
   };
   
+  const handleNewReview = () => {
+    // In a real application, this would show a form to choose a car and set up a review
+    // For now, we'll simulate creating a new review with the API
+    
+    // Get the first car (for demo purposes)
+    fetch('/api/cars')
+      .then(res => res.json())
+      .then(cars => {
+        if (cars && cars.length > 0) {
+          // Create a new review for this car
+          const today = new Date();
+          const endDate = new Date(today);
+          endDate.setDate(today.getDate() + 14); // Set due date 2 weeks from now
+          
+          fetch('/api/reviews', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              carId: cars[0].id,
+              reviewerId: user?.id,
+              startDate: today.toISOString(),
+              endDate: endDate.toISOString(),
+              status: 'pending'
+            })
+          })
+          .then(res => res.json())
+          .then(newReview => {
+            // Navigate to the new review
+            setLocation(`/reviews/${newReview.id}`);
+          })
+          .catch(err => {
+            console.error('Error creating review:', err);
+            alert('Failed to create new review. Please try again.');
+          });
+        } else {
+          alert('No cars available to review. Please add cars first.');
+        }
+      })
+      .catch(err => {
+        console.error('Error fetching cars:', err);
+        alert('Failed to fetch cars. Please try again.');
+      });
+  };
+  
   // Render loading state
   if (isLoading) {
     return (
@@ -112,7 +158,7 @@ export default function ReviewerDashboard() {
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-2xl font-medium text-foreground">Your Review Queue</h2>
         <div className="hidden sm:block">
-          <Button>
+          <Button onClick={handleNewReview}>
             <PlusCircle className="mr-1 h-4 w-4" />
             New Review
           </Button>
@@ -144,7 +190,7 @@ export default function ReviewerDashboard() {
                   </div>
                   <div className="mt-4 flex justify-between items-center">
                     <div>
-                      <p className="text-sm text-muted-foreground">Time Window:</p>
+                      <p className="text-sm text-muted-foreground">Due Date:</p>
                       <p className="text-sm font-medium">
                         {formatDateRange(review.startDate, review.endDate)}
                       </p>
