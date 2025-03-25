@@ -488,7 +488,7 @@ export function MediaCapture({
         throw new Error("No video data recorded");
       }
       
-      // Set loading state but keep the camera view open
+      // Set loading state 
       setIsLoading(true);
       
       console.log("Processing recorded video chunks:", recordedChunksRef.current.length);
@@ -523,9 +523,13 @@ export function MediaCapture({
       const updatedMediaWithTemp = [...media, tempItem];
       onChange(updatedMediaWithTemp);
       
+      // We need to reset camera mode to null here but will reactivate it after upload
+      const currentFacingMode = facingMode; // Save current facing mode
+      setCameraMode(null);
+      
       toast({
         title: "Video captured",
-        description: "Uploading to server while keeping camera active...",
+        description: "Uploading to server...",
         duration: 3000
       });
       
@@ -566,8 +570,8 @@ export function MediaCapture({
           
           toast({
             title: "Video uploaded",
-            description: "Video has been saved. You can continue recording if needed.",
-            duration: 3000
+            description: "Video has been saved. Reopening camera.",
+            duration: 2000
           });
         } else {
           console.error("Failed to find temporary item in media array");
@@ -577,14 +581,23 @@ export function MediaCapture({
         
         console.log("Video successfully processed and uploaded");
         
-        // We DON'T exit the camera view here - that's the key change
-        // Allow user to keep recording if they want
+        // IMPORTANT NEW APPROACH: 
+        // Instead of trying to keep the camera view open (which isn't working),
+        // we'll re-open it after a short delay
+        setTimeout(() => {
+          if (media.length + 1 < maxItems) { // +1 because we just added one
+            console.log("Re-activating camera after successful upload");
+            // Re-activate camera with the same mode
+            setFacingMode(currentFacingMode);
+            switchCameraMode('video');
+          }
+        }, 500);
         
       } catch (uploadError) {
         console.error("Video upload error:", uploadError);
         toast({
           title: "Video upload failed",
-          description: "Failed to upload the video. You can try again.",
+          description: "Failed to upload the video.",
           variant: "destructive"
         });
         
@@ -594,23 +607,36 @@ export function MediaCapture({
         
         // Revoke the URL
         revokeSafeObjectURL(tempItem.url);
+        
+        // Also reopen the camera after error
+        setTimeout(() => {
+          if (media.length < maxItems) {
+            console.log("Re-activating camera after upload error");
+            setFacingMode(currentFacingMode);
+            switchCameraMode('video');
+          }
+        }, 500);
       }
     } catch (error) {
       console.error("Video processing error:", error);
       toast({
         title: "Video processing failed",
-        description: "Failed to process the video. Please try again.",
+        description: "Failed to process the video. Reopening camera.",
         variant: "destructive"
       });
+      
+      // Also reopen the camera after processing error
+      setTimeout(() => {
+        if (media.length < maxItems) {
+          switchCameraMode('video');
+        }
+      }, 500);
     } finally {
-      // Reset recorder state but don't close the camera
+      // Reset recorder state
       recordedChunksRef.current = [];
       mediaRecorderRef.current = null;
       setIsLoading(false);
       setIsRecording(false);
-      
-      // We're intentionally NOT calling setCameraMode(null) here
-      // to keep the camera view open for more recordings
     }
   };
 
@@ -896,13 +922,13 @@ export function MediaCapture({
       const updatedMediaWithTemp = [...media, tempItem];
       onChange(updatedMediaWithTemp);
       
-      // For consistency with video recording, we DON'T reset camera mode here
-      // This way users can continue taking photos without returning to menu
-      // setCameraMode(null);
+      // We need to reset camera mode to null here but will reactivate it after upload
+      const currentFacingMode = facingMode; // Save current facing mode
+      setCameraMode(null);
       
       toast({
         title: "Image captured",
-        description: "Uploading to server while keeping camera active...",
+        description: "Uploading to server...",
         duration: 3000
       });
       
@@ -944,25 +970,47 @@ export function MediaCapture({
           
           toast({
             title: "Image uploaded",
-            description: "Image has been saved. You can continue taking photos if needed.",
-            duration: 3000
+            description: "Image has been saved. Reopening camera.",
+            duration: 2000
           });
         } else {
           console.error("Failed to find temporary image in media array");
           // Just add the new permanent item
           onChange([...media, mediaItem]);
         }
+        
+        // IMPORTANT NEW APPROACH: 
+        // Instead of trying to keep the camera view open (which doesn't work),
+        // we'll re-open it after a short delay
+        setTimeout(() => {
+          if (media.length + 1 < maxItems) { // +1 because we just added one
+            console.log("Re-activating camera after successful image upload");
+            // Re-activate camera with the same mode
+            setFacingMode(currentFacingMode);
+            switchCameraMode('image');
+          }
+        }, 500);
+        
       } catch (uploadError) {
         console.error("Image upload error:", uploadError);
         toast({
           title: "Image upload failed",
-          description: "Failed to upload the image. Please try again.",
+          description: "Failed to upload the image.",
           variant: "destructive"
         });
         
         // Clean up the temporary item on error
         const cleanMediaArray = updatedMediaWithTemp.filter(item => item.id !== tempItem.id);
         onChange(cleanMediaArray);
+        
+        // Also reopen the camera after error
+        setTimeout(() => {
+          if (media.length < maxItems) {
+            console.log("Re-activating camera after image upload error");
+            setFacingMode(currentFacingMode);
+            switchCameraMode('image');
+          }
+        }, 500);
       }
     } catch (error) {
       console.error("Image capture error:", error);
@@ -971,6 +1019,13 @@ export function MediaCapture({
         description: "There was an error capturing the image.",
         variant: "destructive"
       });
+      
+      // Also reopen the camera after processing error
+      setTimeout(() => {
+        if (media.length < maxItems) {
+          switchCameraMode('image');
+        }
+      }, 500);
     } finally {
       setIsLoading(false);
     }
