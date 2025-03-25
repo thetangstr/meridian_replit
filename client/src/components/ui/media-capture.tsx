@@ -286,6 +286,26 @@ export function MediaCapture({
     }
   };
 
+  // Create safe URL wrapper functions with error handling
+  function createSafeObjectURL(blob: Blob) {
+    try {
+      return URL.createObjectURL(blob);
+    } catch (error) {
+      console.error('Error creating object URL:', error);
+      return '';
+    }
+  }
+  
+  function revokeSafeObjectURL(url: string) {
+    try {
+      if (url.startsWith('blob:')) {
+        URL.revokeObjectURL(url);
+      }
+    } catch (error) {
+      console.error('Error revoking object URL:', error);
+    }
+  }
+
   const processVideoRecording = async () => {
     try {
       if (recordedChunksRef.current.length === 0) {
@@ -295,8 +315,12 @@ export function MediaCapture({
       // Set loading state
       setIsLoading(true);
       
+      console.log("Processing recorded video chunks:", recordedChunksRef.current.length);
+      
       // Process the recorded chunks
       const videoBlob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
+      console.log("Created video blob of size:", videoBlob.size);
+      
       const tempVideoUrl = createSafeObjectURL(videoBlob);
       
       // Create temporary media item
@@ -308,8 +332,20 @@ export function MediaCapture({
         createdAt: new Date().toISOString()
       };
       
+      // Check if we've reached the maximum number of media items
+      if (media.length >= maxItems) {
+        toast({
+          title: "Maximum media limit reached",
+          description: `You can only have up to ${maxItems} items. Delete some to add more.`,
+          variant: "destructive"
+        });
+        setIsLoading(false);
+        return;
+      }
+
       // Add to media collection with the temporary item
-      onChange([...media, tempItem]);
+      const updatedMediaWithTemp = [...media, tempItem];
+      onChange(updatedMediaWithTemp);
       
       toast({
         title: "Video captured",
@@ -332,21 +368,34 @@ export function MediaCapture({
         
         // Get the permanent media item from the server response
         const mediaItem: MediaItem = await response.json();
+        console.log("Received permanent media item from server:", mediaItem);
         
-        // Replace the temporary item with the permanent one
-        const updatedMedia = [...media];
-        const tempIndex = updatedMedia.length - 1; // Index of the item we just added
+        // Find the temporary item in the updated media array
+        const tempIndex = updatedMediaWithTemp.findIndex(item => item.id === tempItem.id);
         
-        // Safely revoke the temporary object URL
-        revokeSafeObjectURL(tempItem.url);
-        
-        // Update with the permanent media item
-        onChange([...updatedMedia.slice(0, tempIndex), mediaItem, ...updatedMedia.slice(tempIndex + 1)]);
-        
-        toast({
-          title: "Video captured",
-          description: "Video has been saved to the server."
-        });
+        if (tempIndex !== -1) {
+          // Safely revoke the temporary object URL
+          revokeSafeObjectURL(tempItem.url);
+          
+          // Create a new array with the temporary item replaced by the permanent one
+          const finalUpdatedMedia = [
+            ...updatedMediaWithTemp.slice(0, tempIndex), 
+            mediaItem, 
+            ...updatedMediaWithTemp.slice(tempIndex + 1)
+          ];
+          
+          // Update with the permanent media item
+          onChange(finalUpdatedMedia);
+          
+          toast({
+            title: "Video captured",
+            description: "Video has been saved to the server."
+          });
+        } else {
+          console.error("Failed to find temporary item in media array");
+          // Just add the new permanent item
+          onChange([...media, mediaItem]);
+        }
         
         // Now we can safely stop the camera
         stopCamera();
@@ -359,8 +408,8 @@ export function MediaCapture({
         });
         
         // Clean up the temporary item on error
-        const updatedMedia = media.filter(item => item.id !== tempItem.id);
-        onChange(updatedMedia);
+        const cleanMediaArray = updatedMediaWithTemp.filter(item => item.id !== tempItem.id);
+        onChange(cleanMediaArray);
         
         // Revoke the URL
         revokeSafeObjectURL(tempItem.url);
@@ -458,8 +507,20 @@ export function MediaCapture({
     try {
       setIsLoading(true);
       
+      // Check if we've reached the maximum number of media items
+      if (media.length >= maxItems) {
+        toast({
+          title: "Maximum media limit reached",
+          description: `You can only have up to ${maxItems} items. Delete some to add more.`,
+          variant: "destructive"
+        });
+        setIsLoading(false);
+        return;
+      }
+      
       // Take the photo using react-camera-pro library
       const photo = cameraRef.current.takePhoto();
+      console.log("Photo captured successfully");
       
       // Create a temporary item for immediate display
       const tempItem: MediaItem = {
@@ -470,8 +531,9 @@ export function MediaCapture({
         createdAt: new Date().toISOString()
       };
       
-      // Add to media collection
-      onChange([...media, tempItem]);
+      // Add to media collection while preserving existing items
+      const updatedMediaWithTemp = [...media, tempItem];
+      onChange(updatedMediaWithTemp);
       
       // Reset camera state
       setCameraMode(null);
@@ -501,18 +563,31 @@ export function MediaCapture({
         
         // Get the permanent media item from the server response
         const mediaItem: MediaItem = await uploadResponse.json();
+        console.log("Received permanent image from server:", mediaItem);
         
-        // Replace the temporary item with the permanent one
-        const updatedMedia = [...media];
-        const tempIndex = updatedMedia.length - 1; // Index of the item we just added
+        // Find the temporary item in the updated media array
+        const tempIndex = updatedMediaWithTemp.findIndex(item => item.id === tempItem.id);
         
-        // Update with the permanent media item
-        onChange([...updatedMedia.slice(0, tempIndex), mediaItem, ...updatedMedia.slice(tempIndex + 1)]);
-        
-        toast({
-          title: "Image captured",
-          description: "Image has been saved to the server."
-        });
+        if (tempIndex !== -1) {
+          // Create a new array with the temporary item replaced by the permanent one
+          const finalUpdatedMedia = [
+            ...updatedMediaWithTemp.slice(0, tempIndex), 
+            mediaItem, 
+            ...updatedMediaWithTemp.slice(tempIndex + 1)
+          ];
+          
+          // Update with the permanent media item
+          onChange(finalUpdatedMedia);
+          
+          toast({
+            title: "Image captured",
+            description: "Image has been saved to the server."
+          });
+        } else {
+          console.error("Failed to find temporary image in media array");
+          // Just add the new permanent item
+          onChange([...media, mediaItem]);
+        }
       } catch (uploadError) {
         console.error("Image upload error:", uploadError);
         toast({
@@ -522,8 +597,8 @@ export function MediaCapture({
         });
         
         // Clean up the temporary item on error
-        const updatedMedia = media.filter(item => item.id !== tempItem.id);
-        onChange(updatedMedia);
+        const cleanMediaArray = updatedMediaWithTemp.filter(item => item.id !== tempItem.id);
+        onChange(cleanMediaArray);
       }
     } catch (error) {
       console.error("Image capture error:", error);
