@@ -1,4 +1,4 @@
-import type { Express, Request, Response, NextFunction } from "express";
+import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import passport from "passport";
@@ -546,6 +546,108 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: String(error) });
     }
   });
+  
+  // Set up media upload directory and config
+  const uploadsDir = path.join(process.cwd(), 'public/uploads');
+  
+  // Ensure uploads directory exists
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+  
+  // Configure multer for file uploads
+  const multerStorage = multer.diskStorage({
+    destination: function (req, file, cb) {
+      cb(null, uploadsDir);
+    },
+    filename: function (req, file, cb) {
+      // Create a unique filename with original extension
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+      const ext = path.extname(file.originalname);
+      cb(null, `${uniqueSuffix}${ext}`);
+    }
+  });
+  
+  const fileFilter = (req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+    // Accept images and videos
+    if (file.mimetype.startsWith('image/') || file.mimetype.startsWith('video/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only images and videos are allowed'));
+    }
+  };
+  
+  const upload = multer({ 
+    storage: multerStorage,
+    fileFilter,
+    limits: {
+      fileSize: 50 * 1024 * 1024, // 50MB max file size
+    }
+  });
+  
+  // Media upload endpoint
+  app.post('/api/media/upload', isAuthenticated, upload.single('file'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: 'No file uploaded' });
+      }
+      
+      const file = req.file;
+      const isVideo = file.mimetype.startsWith('video/');
+      
+      const mediaData = {
+        filename: file.filename,
+        originalName: file.originalname,
+        mimetype: file.mimetype,
+        size: file.size,
+        type: isVideo ? 'video' as const : 'image' as const,
+        userId: req.user.id
+      };
+      
+      const mediaItem = await storage.saveMedia(mediaData);
+      res.status(201).json(mediaItem);
+    } catch (error) {
+      console.error('Media upload error:', error);
+      res.status(500).json({ error: String(error) });
+    }
+  });
+  
+  // Get media item endpoint
+  app.get('/api/media/:id', isAuthenticated, async (req, res) => {
+    try {
+      const mediaId = req.params.id;
+      const mediaItem = await storage.getMediaItem(mediaId);
+      
+      if (!mediaItem) {
+        return res.status(404).json({ error: 'Media item not found' });
+      }
+      
+      res.json(mediaItem);
+    } catch (error) {
+      res.status(500).json({ error: String(error) });
+    }
+  });
+  
+  // Delete media item endpoint
+  app.delete('/api/media/:id', isAuthenticated, async (req, res) => {
+    try {
+      const mediaId = req.params.id;
+      const userId = req.user.id;
+      
+      const success = await storage.deleteMedia(mediaId, userId);
+      
+      if (!success) {
+        return res.status(404).json({ error: 'Media item not found or unauthorized' });
+      }
+      
+      res.status(200).json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: String(error) });
+    }
+  });
+  
+  // Serve uploaded files
+  app.use('/uploads', express.static(uploadsDir));
   
   // Create HTTP server
   const httpServer = createServer(app);

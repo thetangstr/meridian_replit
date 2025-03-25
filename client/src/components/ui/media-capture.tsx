@@ -120,33 +120,74 @@ export function MediaCapture({
               }
             };
             
-            mediaRecorder.onstop = () => {
-              // Process the recorded chunks
-              const videoBlob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
-              const videoUrl = URL.createObjectURL(videoBlob);
-              
-              // Create new media item
-              const newItem: MediaItem = {
-                id: `temp-${Date.now()}`,
-                type: 'video',
-                url: videoUrl,
-                createdAt: new Date().toISOString()
-              };
-              
-              // Add to media collection
-              onChange([...media, newItem]);
-              
-              toast({
-                title: "Video captured",
-                description: "Video has been added to your evidence."
-              });
-              
-              // Reset recorder and stream
-              recordedChunksRef.current = [];
-              mediaRecorderRef.current = null;
-              
-              // Close the camera preview
-              stopCamera();
+            mediaRecorder.onstop = async () => {
+              try {
+                // Process the recorded chunks
+                const videoBlob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
+                const tempVideoUrl = URL.createObjectURL(videoBlob);
+                
+                // Create temporary media item
+                const tempItem: MediaItem = {
+                  id: `temp-${Date.now()}`,
+                  type: 'video',
+                  url: tempVideoUrl,
+                  createdAt: new Date().toISOString()
+                };
+                
+                // Add to media collection with the temporary item
+                onChange([...media, tempItem]);
+                
+                // Close the camera preview
+                stopCamera();
+                
+                toast({
+                  title: "Video captured",
+                  description: "Uploading to server..."
+                });
+                
+                // Upload the video to the server
+                const formData = new FormData();
+                formData.append('file', videoBlob, `recording-${Date.now()}.webm`);
+                
+                const response = await fetch('/api/media/upload', {
+                  method: 'POST',
+                  body: formData,
+                  credentials: 'include'
+                });
+                
+                if (!response.ok) {
+                  throw new Error(`Upload failed: ${response.statusText}`);
+                }
+                
+                // Get the permanent media item from the server response
+                const mediaItem: MediaItem = await response.json();
+                
+                // Replace the temporary item with the permanent one
+                const updatedMedia = [...media];
+                const tempIndex = updatedMedia.length; // Index of the item we just added
+                
+                // Revoke the temporary object URL
+                URL.revokeObjectURL(tempItem.url);
+                
+                // Update with the permanent media item
+                onChange([...updatedMedia.slice(0, tempIndex), mediaItem]);
+                
+                toast({
+                  title: "Video captured",
+                  description: "Video has been saved to the server."
+                });
+              } catch (uploadError) {
+                console.error('Video upload error:', uploadError);
+                toast({
+                  title: "Upload failed",
+                  description: "Video was captured but couldn't be uploaded to server.",
+                  variant: "destructive"
+                });
+              } finally {
+                // Reset recorder and stream
+                recordedChunksRef.current = [];
+                mediaRecorderRef.current = null;
+              }
             };
             
             // Start recording immediately
@@ -218,31 +259,75 @@ export function MediaCapture({
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       
       // Convert canvas to blob
-      canvas.toBlob((blob) => {
+      canvas.toBlob(async (blob) => {
         if (!blob) return;
         
-        // Create object URL from blob
-        const objectUrl = URL.createObjectURL(blob);
-        
-        // Create new media item
-        const newItem: MediaItem = {
-          id: `temp-${Date.now()}`,
-          type: 'image',
-          url: objectUrl,
-          thumbnailUrl: objectUrl,
-          createdAt: new Date().toISOString()
-        };
-        
-        // Add to media collection
-        onChange([...media, newItem]);
-        
-        // Stop camera stream
-        stopCamera();
-        
-        toast({
-          title: "Image captured",
-          description: "Image has been added to your evidence."
-        });
+        try {
+          // Create temporary object URL for immediate display
+          const tempObjectUrl = URL.createObjectURL(blob);
+          
+          // Create temporary media item
+          const tempItem: MediaItem = {
+            id: `temp-${Date.now()}`,
+            type: 'image',
+            url: tempObjectUrl,
+            thumbnailUrl: tempObjectUrl,
+            createdAt: new Date().toISOString()
+          };
+          
+          // Add to media collection with the temporary item
+          onChange([...media, tempItem]);
+          
+          // Stop camera stream
+          stopCamera();
+          
+          toast({
+            title: "Image captured",
+            description: "Uploading to server..."
+          });
+          
+          // Upload the image to the server
+          const formData = new FormData();
+          formData.append('file', blob, `capture-${Date.now()}.jpg`);
+          
+          const response = await fetch('/api/media/upload', {
+            method: 'POST',
+            body: formData,
+            credentials: 'include'
+          });
+          
+          if (!response.ok) {
+            throw new Error(`Upload failed: ${response.statusText}`);
+          }
+          
+          // Get the permanent media item from the server response
+          const mediaItem: MediaItem = await response.json();
+          
+          // Replace the temporary item with the permanent one
+          const updatedMedia = [...media];
+          const tempIndex = updatedMedia.length; // Index of the item we just added
+          
+          // Revoke the temporary object URL
+          URL.revokeObjectURL(tempItem.url);
+          if (tempItem.thumbnailUrl) {
+            URL.revokeObjectURL(tempItem.thumbnailUrl);
+          }
+          
+          // Update with the permanent media item
+          onChange([...updatedMedia.slice(0, tempIndex), mediaItem]);
+          
+          toast({
+            title: "Image captured",
+            description: "Image has been saved to the server."
+          });
+        } catch (uploadError) {
+          console.error('Image upload error:', uploadError);
+          toast({
+            title: "Upload failed",
+            description: "Image was captured but couldn't be uploaded to server.",
+            variant: "destructive"
+          });
+        }
       }, 'image/jpeg', 0.95);
       
     } catch (error) {
@@ -313,10 +398,6 @@ export function MediaCapture({
     try {
       setIsCapturing(true);
       
-      // In a real implementation, this would upload to server
-      // Here we're just simulating with a local URL
-      const newItems: MediaItem[] = [];
-      
       // Check if adding these files would exceed the limit
       if (media.length + files.length > maxItems) {
         toast({
@@ -327,31 +408,66 @@ export function MediaCapture({
         return;
       }
       
+      const newItems: MediaItem[] = [];
+      
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        const objectUrl = URL.createObjectURL(file);
         
-        // In a real implementation, we would get this URL from the server
-        newItems.push({
+        // Create a temporary object URL for immediate display
+        const tempObjectUrl = URL.createObjectURL(file);
+        const tempItem: MediaItem = {
           id: `temp-${Date.now()}-${i}`,
           type,
-          url: objectUrl,
-          thumbnailUrl: type === 'video' ? undefined : objectUrl,
+          url: tempObjectUrl,
+          thumbnailUrl: type === 'video' ? undefined : tempObjectUrl,
           createdAt: new Date().toISOString()
-        });
+        };
+        
+        // Add temporary item to show immediate feedback
+        newItems.push(tempItem);
         
         // Prepare form data for upload
         const formData = new FormData();
         formData.append('file', file);
-        formData.append('type', type);
         
-        // This would normally send to the server
-        // const response = await fetch('/api/media/upload', {
-        //   method: 'POST',
-        //   body: formData
-        // });
+        try {
+          // Upload the file to the server
+          const response = await fetch('/api/media/upload', {
+            method: 'POST',
+            body: formData,
+            credentials: 'include'
+          });
+          
+          if (!response.ok) {
+            throw new Error(`Upload failed: ${response.statusText}`);
+          }
+          
+          // Get the permanent media item from the server response
+          const mediaItem: MediaItem = await response.json();
+          
+          // Replace the temporary item with the permanent one
+          const itemIndex = newItems.findIndex(item => item.id === tempItem.id);
+          if (itemIndex !== -1) {
+            // Revoke the temporary object URL
+            URL.revokeObjectURL(tempItem.url);
+            if (tempItem.thumbnailUrl) {
+              URL.revokeObjectURL(tempItem.thumbnailUrl);
+            }
+            
+            // Replace with permanent item
+            newItems[itemIndex] = mediaItem;
+          }
+        } catch (uploadError) {
+          console.error('File upload error:', uploadError);
+          toast({
+            title: "Upload failed",
+            description: "Could not upload file to server.",
+            variant: "destructive"
+          });
+        }
       }
       
+      // Update media state with new items
       onChange([...media, ...newItems]);
       
       // Reset the file input
