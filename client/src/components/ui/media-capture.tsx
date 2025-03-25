@@ -487,18 +487,42 @@ export function MediaCapture({
     }
   };
 
-  const handleRemoveMedia = (index: number) => {
+  const handleRemoveMedia = async (index: number) => {
     const newMedia = [...media];
     
-    // Release object URL if it's a local URL
+    // Get the item to be removed
     const item = newMedia[index];
-    if (item.url.startsWith('blob:')) {
-      URL.revokeObjectURL(item.url);
-      if (item.thumbnailUrl?.startsWith('blob:')) {
-        URL.revokeObjectURL(item.thumbnailUrl);
+    
+    try {
+      // If it's a temporary object URL, release it
+      if (item.url.startsWith('blob:')) {
+        URL.revokeObjectURL(item.url);
+        if (item.thumbnailUrl?.startsWith('blob:')) {
+          URL.revokeObjectURL(item.thumbnailUrl);
+        }
+      } 
+      // If it's a server item (has an ID not starting with 'temp-'), delete it from the server
+      else if (item.id && !item.id.startsWith('temp-')) {
+        const response = await fetch(`/api/media/${item.id}`, {
+          method: 'DELETE',
+          credentials: 'include'
+        });
+        
+        if (!response.ok) {
+          console.error('Failed to delete media from server:', response.statusText);
+          // Continue with UI removal even if server deletion fails
+        }
       }
+    } catch (error) {
+      console.error('Error removing media:', error);
+      toast({
+        title: "Error removing media",
+        description: "The item was removed from the form but may still exist on the server.",
+        variant: "destructive"
+      });
     }
     
+    // Remove from local array regardless of server response
     newMedia.splice(index, 1);
     onChange(newMedia);
   };

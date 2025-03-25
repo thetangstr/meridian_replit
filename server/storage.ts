@@ -1,3 +1,6 @@
+import fs from "fs";
+import path from "path";
+
 import { 
   users,
   User,
@@ -829,9 +832,29 @@ export class MemStorage implements IStorage {
       return false;
     }
     
-    // In a real implementation, this would delete the file from storage
-    this.mediaItems.delete(id);
-    return true;
+    try {
+      // Extract the filename from the URL
+      const urlPath = new URL(item.url).pathname;
+      const filename = urlPath.split('/').pop();
+      
+      if (filename) {
+        // Construct the path to the file
+        const filePath = path.join(process.cwd(), 'public/uploads', filename);
+        
+        // Check if file exists
+        if (fs.existsSync(filePath)) {
+          // Delete the file
+          fs.unlinkSync(filePath);
+        }
+      }
+      
+      // Remove from in-memory storage
+      this.mediaItems.delete(id);
+      return true;
+    } catch (error) {
+      console.error('Error deleting media file:', error);
+      return false;
+    }
   }
 }
 
