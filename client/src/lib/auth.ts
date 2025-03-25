@@ -18,8 +18,10 @@ export const useAuth = create<AuthState>((set) => ({
   error: null,
   
   login: async (username: string, password: string) => {
+    console.log(`Attempting login with username: ${username}`);
     set({ loading: true, error: null });
     try {
+      console.log('Making login request...');
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -27,14 +29,35 @@ export const useAuth = create<AuthState>((set) => ({
         credentials: 'include',
       });
       
+      console.log('Login response status:', res.status);
+      
       if (!res.ok) {
         const error = await res.text();
+        console.error('Login error:', error);
         throw new Error(error || 'Failed to login');
       }
       
       const user = await res.json();
+      console.log('Login successful, user data:', user);
+      
       set({ isAuthenticated: true, user, loading: false });
+      console.log('Auth state updated:', { isAuthenticated: true, user, loading: false });
+      
+      // Verify session immediately
+      try {
+        const sessionCheck = await fetch('/api/auth/me', {
+          credentials: 'include',
+        });
+        console.log('Session check after login:', sessionCheck.status);
+        if (sessionCheck.ok) {
+          const sessionUser = await sessionCheck.json();
+          console.log('Session user data:', sessionUser);
+        }
+      } catch (e) {
+        console.error('Session check error:', e);
+      }
     } catch (error) {
+      console.error('Login error caught:', error);
       set({ 
         isAuthenticated: false, 
         user: null, 

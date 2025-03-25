@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,7 +9,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
-import { Car } from "lucide-react";
+import { Car, AlertCircle } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const loginSchema = z.object({
   username: z.string().min(1, "Username is required"),
@@ -19,10 +20,18 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function Login() {
-  const { login, error } = useAuth();
+  const { login, error, isAuthenticated } = useAuth();
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [_, setLocation] = useLocation();
   const { toast } = useToast();
+  const [loginAttempts, setLoginAttempts] = useState(0);
+
+  // If already authenticated, redirect to homepage
+  useEffect(() => {
+    if (isAuthenticated) {
+      setLocation("/");
+    }
+  }, [isAuthenticated, setLocation]);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -33,11 +42,15 @@ export default function Login() {
   });
 
   const onSubmit = async (data: LoginFormValues) => {
+    console.log("Form submitted with:", data);
     setIsLoggingIn(true);
     try {
       await login(data.username, data.password);
-      setLocation("/");
+      // The redirection is handled by the useEffect above
     } catch (err) {
+      console.error("Login error in form:", err);
+      setLoginAttempts(prev => prev + 1);
+      
       toast({
         title: "Login Failed",
         description: error || "Invalid username or password",
@@ -45,6 +58,28 @@ export default function Login() {
       });
     } finally {
       setIsLoggingIn(false);
+    }
+  };
+
+  // Helper function to fill demo credentials
+  const fillDemoCredentials = (role: string) => {
+    switch(role) {
+      case 'reviewer':
+        form.setValue('username', 'reviewer');
+        form.setValue('password', 'review123');
+        break;
+      case 'admin':
+        form.setValue('username', 'admin');
+        form.setValue('password', 'admin123');
+        break;
+      case 'internal':
+        form.setValue('username', 'internal');
+        form.setValue('password', 'internal123');
+        break;
+      case 'external':
+        form.setValue('username', 'external');
+        form.setValue('password', 'external123');
+        break;
     }
   };
 
@@ -63,6 +98,22 @@ export default function Login() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {loginAttempts > 0 && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Login Failed</AlertTitle>
+              <AlertDescription>
+                Please use one of the following test accounts:
+                <div className="mt-2 text-xs bg-white/20 p-2 rounded">
+                  <div><strong>Reviewer:</strong> username: reviewer, password: review123</div>
+                  <div><strong>Admin:</strong> username: admin, password: admin123</div>
+                  <div><strong>Internal:</strong> username: internal, password: internal123</div>
+                  <div><strong>External:</strong> username: external, password: external123</div>
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
+          
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FormField
@@ -94,6 +145,44 @@ export default function Login() {
               <Button type="submit" className="w-full" disabled={isLoggingIn}>
                 {isLoggingIn ? "Logging in..." : "Sign In"}
               </Button>
+              
+              <div className="mt-4">
+                <p className="text-xs text-center mb-2 text-gray-500">Quick access demo accounts:</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => fillDemoCredentials('reviewer')}
+                  >
+                    Reviewer
+                  </Button>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => fillDemoCredentials('admin')}
+                  >
+                    Admin
+                  </Button>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => fillDemoCredentials('internal')}
+                  >
+                    Internal
+                  </Button>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => fillDemoCredentials('external')}
+                  >
+                    External
+                  </Button>
+                </div>
+              </div>
             </form>
           </Form>
         </CardContent>
