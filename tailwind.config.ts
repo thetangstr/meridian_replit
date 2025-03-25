@@ -51,6 +51,12 @@ export default {
           "4": "hsl(var(--chart-4))",
           "5": "hsl(var(--chart-5))",
         },
+        score: {
+          poor: "rgb(var(--score-poor))",
+          fair: "rgb(var(--score-fair))",
+          good: "rgb(var(--score-good))",
+          excellent: "rgb(var(--score-excellent))",
+        },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
