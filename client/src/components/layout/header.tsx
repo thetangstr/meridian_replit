@@ -18,8 +18,9 @@ function Header() {
   const [_, setLocation] = useLocation();
 
   const handleLogout = async () => {
+    // The logout function now handles redirection
     await logout();
-    setLocation('/login');
+    // No need to manually redirect, it's handled in the auth.ts logout function
   };
 
   if (!user) return null;

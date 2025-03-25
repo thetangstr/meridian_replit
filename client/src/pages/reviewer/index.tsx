@@ -39,7 +39,9 @@ export default function ReviewerDashboard() {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
+              'Accept': 'application/json',
             },
+            credentials: 'include', // Important: Include credentials for authentication
             body: JSON.stringify({
               carId: cars[0].id,
               reviewerId: user?.id,
@@ -48,14 +50,22 @@ export default function ReviewerDashboard() {
               status: 'pending'
             })
           })
-          .then(res => res.json())
+          .then(async (res) => {
+            // Check if the response is successful
+            if (!res.ok) {
+              // Try to get the error message from the response
+              const errorData = await res.json().catch(() => null);
+              throw new Error(errorData?.error || `Error creating review: ${res.status}`);
+            }
+            return res.json();
+          })
           .then(newReview => {
             // Navigate to the new review
             setLocation(`/reviews/${newReview.id}`);
           })
           .catch(err => {
             console.error('Error creating review:', err);
-            alert('Failed to create new review. Please try again.');
+            alert(`Failed to create new review: ${err.message}`);
           });
         } else {
           alert('No cars available to review. Please add cars first.');

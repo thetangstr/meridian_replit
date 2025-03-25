@@ -44,7 +44,12 @@ export default function TaskEvaluationPage() {
     queryKey: [`/api/reviews/${reviewId}/tasks/${taskId}/evaluation`],
   });
   
-  const isLoading = isLoadingTask || isLoadingEvaluation;
+  // Fetch all tasks for this review to find next task in the same category
+  const { data: tasksData, isLoading: isLoadingTasks } = useQuery<{ tasks: Array<Task & { cuj?: { categoryId: number } }>, completedTaskIds: number[] }>({
+    queryKey: [`/api/reviews/${reviewId}/tasks`],
+  });
+  
+  const isLoading = isLoadingTask || isLoadingEvaluation || isLoadingTasks;
   
   // Setup form with existing data if available
   const form = useForm<TaskEvaluationFormValues>({
@@ -57,6 +62,37 @@ export default function TaskEvaluationPage() {
     },
   });
   
+  // Find the next task in the same category
+  const findNextTask = () => {
+    if (!task || !tasksData || !tasksData.tasks) return null;
+    
+    // Get the current task's category ID
+    const currentTask = tasksData.tasks.find(t => t.id === taskId);
+    if (!currentTask || !currentTask.cuj) {
+      return null; // Can't determine the category
+    }
+    
+    const currentCategoryId = currentTask.cuj.categoryId;
+    
+    // Find all tasks in the same category
+    const tasksInSameCategory = tasksData.tasks.filter(t => 
+      t.cuj && t.cuj.categoryId === currentCategoryId
+    );
+    
+    // Sort them by ID to maintain order
+    tasksInSameCategory.sort((a, b) => a.id - b.id);
+    
+    // Find the current task's index
+    const currentIndex = tasksInSameCategory.findIndex(t => t.id === taskId);
+    
+    // If there's a next task in the same category, return it
+    if (currentIndex >= 0 && currentIndex < tasksInSameCategory.length - 1) {
+      return tasksInSameCategory[currentIndex + 1];
+    }
+    
+    return null; // No next task in the same category
+  };
+
   // Submit evaluation mutation
   const submitEvaluation = useMutation({
     mutationFn: async (data: TaskEvaluationFormValues) => {
@@ -76,8 +112,18 @@ export default function TaskEvaluationPage() {
         description: "Your task evaluation has been successfully saved.",
       });
       
-      // Navigate back to review detail
-      setLocation(`/reviews/${reviewId}`);
+      // Find next task in the same category
+      const nextTask = findNextTask();
+      
+      if (nextTask) {
+        // Encode the category ID so the review page knows which category to expand
+        setLocation(`/reviews/${reviewId}/tasks/${nextTask.id}?category=${nextTask.cuj?.categoryId || ''}`);
+      } else {
+        // Get the category ID from tasksData
+        const currentTaskData = tasksData?.tasks?.find(t => t.id === taskId);
+        const currentCategoryId = currentTaskData?.cuj?.categoryId;
+        setLocation(`/reviews/${reviewId}${currentCategoryId ? `?expandCategory=${currentCategoryId}` : ''}`);
+      }
     },
     onError: (error) => {
       toast({

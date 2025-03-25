@@ -70,16 +70,38 @@ export const useAuth = create<AuthState>((set) => ({
   logout: async () => {
     set({ loading: true });
     try {
-      await fetch('/api/auth/logout', {
+      console.log('Logging out...');
+      const res = await fetch('/api/auth/logout', {
         method: 'POST',
         credentials: 'include',
       });
+      
+      // Always clear the user data regardless of the response
       set({ isAuthenticated: false, user: null, loading: false });
+      
+      // Manually invalidate the session storage to ensure complete logout
+      window.sessionStorage.clear();
+      
+      // Redirect to login on next execution cycle
+      setTimeout(() => {
+        window.location.href = '/login';
+      }, 100);
+      
+      console.log('Logout complete, auth state cleared');
     } catch (error) {
+      console.error('Logout error:', error);
+      // Still clear the user data even if there's an error
       set({ 
+        isAuthenticated: false,
+        user: null,
         loading: false, 
         error: error instanceof Error ? error.message : 'An error occurred during logout' 
       });
+      
+      // Force redirect on error as well
+      setTimeout(() => {
+        window.location.href = '/login';
+      }, 100);
     }
   },
   

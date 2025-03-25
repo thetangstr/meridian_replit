@@ -22,6 +22,30 @@ import {
   scoringConfig
 } from "@shared/schema";
 
+// Add User type to Express Request
+declare global {
+  namespace Express {
+    interface User {
+      id: number;
+      username: string;
+      password: string;
+      name: string;
+      role: string;
+    }
+  }
+}
+
+// Type for requests with authenticated user
+interface AuthenticatedRequest extends Request {
+  user: {
+    id: number;
+    username: string;
+    password: string;
+    name: string;
+    role: string;
+  };
+}
+
 // Setup memory store for sessions
 const MemoryStore = memoryStore(session);
 
@@ -74,7 +98,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Authentication middleware
-  const isAuthenticated = (req: any, res: any, next: any) => {
+  const isAuthenticated = (req: Request, res: Response, next: NextFunction) => {
     if (req.isAuthenticated()) {
       return next();
     }
@@ -83,12 +107,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Role-based authorization middleware
   const hasRole = (roles: string[]) => {
-    return (req: any, res: any, next: any) => {
+    return (req: Request, res: Response, next: NextFunction) => {
       if (!req.isAuthenticated()) {
         return res.status(401).send('Unauthorized');
       }
       
-      if (!roles.includes(req.user.role)) {
+      if (!roles.includes((req as AuthenticatedRequest).user.role)) {
         return res.status(403).send('Forbidden: Insufficient permissions');
       }
       
@@ -167,9 +191,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Review routes
-  app.get('/api/reviews', isAuthenticated, async (req, res) => {
-    const reviewerId = req.user.id;
-    const isAdmin = req.user.role === 'admin';
+  app.get('/api/reviews', isAuthenticated, async (req: Request, res: Response) => {
+    const authenticatedReq = req as AuthenticatedRequest;
+    const reviewerId = authenticatedReq.user.id;
+    const isAdmin = authenticatedReq.user.role === 'admin';
     
     // Admin can see all reviews, reviewers only see their own
     const reviews = isAdmin 
@@ -228,9 +253,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.post('/api/reviews', isAuthenticated, hasRole(['admin']), async (req, res) => {
+  app.post('/api/reviews', isAuthenticated, hasRole(['admin', 'reviewer']), async (req, res) => {
     try {
       const reviewData = insertReviewSchema.parse(req.body);
+      
+      // Ensure the reviewerId matches the logged-in user for non-admin users
+      if (req.user && req.user.role !== 'admin' && reviewData.reviewerId !== req.user.id) {
+        return res.status(403).json({ 
+          error: 'You can only create reviews assigned to yourself' 
+        });
+      }
+      
       const newReview = await storage.createReview(reviewData);
       res.status(201).json(newReview);
     } catch (error) {

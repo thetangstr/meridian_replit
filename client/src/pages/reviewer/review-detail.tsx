@@ -34,8 +34,31 @@ export default function ReviewDetail() {
   const [_, setLocation] = useLocation();
   const queryClient = useQueryClient();
   
+  // Get query parameters from URL
+  const getURLParams = () => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      return params;
+    }
+    return new URLSearchParams();
+  };
+  
   // Track expanded categories
-  const [expandedCategories, setExpandedCategories] = useState<number[]>([]);
+  const [expandedCategories, setExpandedCategories] = useState<number[]>(() => {
+    // Check for expandCategory parameter in URL
+    const params = getURLParams();
+    const expandCategory = params.get('expandCategory');
+    return expandCategory ? [parseInt(expandCategory)] : [];
+  });
+  
+  // Also look for category parameter which is passed from task evaluation page
+  useEffect(() => {
+    const params = getURLParams();
+    const category = params.get('category');
+    if (category && !expandedCategories.includes(parseInt(category))) {
+      setExpandedCategories(prev => [...prev, parseInt(category)]);
+    }
+  }, []);
   
   // Store task evaluations data
   const [taskEvaluations, setTaskEvaluations] = useState<Record<number, TaskEvaluation>>({});
