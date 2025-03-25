@@ -19,6 +19,7 @@ const taskEvaluationSchema = z.object({
   doable: z.boolean(),
   usabilityScore: z.number().min(1).max(4),
   visualsScore: z.number().min(1).max(4),
+  notes: z.string().optional(),
   media: z.any().optional(),
 });
 
@@ -53,6 +54,7 @@ export default function TaskEvaluationPage() {
       doable: evaluation?.doable ?? true,
       usabilityScore: evaluation?.usabilityScore ?? 3,
       visualsScore: evaluation?.visualsScore ?? 3,
+      notes: evaluation?.notes ?? "",
       media: evaluation?.media ?? [],
     },
   });
@@ -307,6 +309,33 @@ export default function TaskEvaluationPage() {
                           </div>
                         ))}
                       </RadioGroup>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </CardContent>
+          </Card>
+          
+          {/* Feedback Notes */}
+          <Card>
+            <CardContent className="p-4">
+              <h4 className="font-medium">Reviewer Feedback</h4>
+              <p className="text-sm text-muted-foreground mb-4">
+                Add your feedback, observations, or notes about this task.
+              </p>
+              
+              <FormField
+                control={form.control}
+                name="notes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <textarea 
+                        className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        placeholder="Enter your feedback here... What worked well? What could be improved? Any specific issues or observations?"
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

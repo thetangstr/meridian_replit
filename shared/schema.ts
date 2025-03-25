@@ -112,6 +112,7 @@ export const taskEvaluations = pgTable("task_evaluations", {
   doable: boolean("doable"),
   usabilityScore: integer("usability_score"), // 1-4
   visualsScore: integer("visuals_score"), // 1-4
+  notes: text("notes"), // Reviewer notes and feedback
   media: json("media").default([]), // Array of image/video URLs
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -123,6 +124,7 @@ export const insertTaskEvaluationSchema = createInsertSchema(taskEvaluations).pi
   doable: true,
   usabilityScore: true,
   visualsScore: true,
+  notes: true,
   media: true,
 });
 
