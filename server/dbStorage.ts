@@ -1,34 +1,25 @@
 import { eq, and, desc, sql } from "drizzle-orm";
 import { db } from "../shared/db";
+import * as schema from "../shared/schema";
 import {
-  users,
   User,
   InsertUser,
-  cujCategories,
   CujCategory,
   InsertCujCategory,
-  cujs,
   Cuj,
   InsertCuj,
-  tasks,
   Task,
   InsertTask,
-  cars,
   Car,
   InsertCar,
-  reviews,
   Review,
   InsertReview,
-  taskEvaluations,
   TaskEvaluation,
   InsertTaskEvaluation,
-  categoryEvaluations,
   CategoryEvaluation,
   InsertCategoryEvaluation,
-  scoringConfig,
   ScoringConfig,
   InsertScoringConfig,
-  reports,
   Report,
   InsertReport,
   ReviewWithDetails,
@@ -57,62 +48,62 @@ export class DbStorage implements IStorage {
 
   // User operations
   async getUser(id: number): Promise<User | undefined> {
-    const result = await db.select().from(users).where(eq(users.id, id));
+    const result = await db.select().from(schema.users).where(eq(schema.users.id, id));
     return result[0];
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    const result = await db.select().from(users).where(eq(users.username, username));
+    const result = await db.select().from(schema.users).where(eq(schema.users.username, username));
     return result[0];
   }
 
   async createUser(user: InsertUser): Promise<User> {
-    const result = await db.insert(users).values(user).returning();
+    const result = await db.insert(schema.users).values(user).returning();
     return result[0];
   }
 
   async getAllUsers(): Promise<User[]> {
-    return await db.select().from(users);
+    return await db.select().from(schema.users);
   }
 
   // CUJ Category operations
   async getCujCategory(id: number): Promise<CujCategory | undefined> {
-    const result = await db.select().from(cujCategories).where(eq(cujCategories.id, id));
+    const result = await db.select().from(schema.cujCategories).where(eq(schema.cujCategories.id, id));
     return result[0];
   }
 
   async getAllCujCategories(): Promise<CujCategory[]> {
-    return await db.select().from(cujCategories);
+    return await db.select().from(schema.cujCategories);
   }
 
   async createCujCategory(category: InsertCujCategory): Promise<CujCategory> {
-    const result = await db.insert(cujCategories).values(category).returning();
+    const result = await db.insert(schema.cujCategories).values(category).returning();
     return result[0];
   }
 
   // CUJ operations
   async getCuj(id: number): Promise<Cuj | undefined> {
-    const result = await db.select().from(cujs).where(eq(cujs.id, id));
+    const result = await db.select().from(schema.cujs).where(eq(schema.cujs.id, id));
     return result[0];
   }
 
   async getCujsForCategory(categoryId: number): Promise<Cuj[]> {
-    return await db.select().from(cujs).where(eq(cujs.categoryId, categoryId));
+    return await db.select().from(schema.cujs).where(eq(schema.cujs.categoryId, categoryId));
   }
 
   async createCuj(cuj: InsertCuj): Promise<Cuj> {
-    const result = await db.insert(cujs).values(cuj).returning();
+    const result = await db.insert(schema.cujs).values(cuj).returning();
     return result[0];
   }
 
   // Task operations
   async getTask(id: number): Promise<Task | undefined> {
-    const result = await db.select().from(tasks).where(eq(tasks.id, id));
+    const result = await db.select().from(schema.tasks).where(eq(schema.tasks.id, id));
     return result[0];
   }
 
   async getTasksForCuj(cujId: number): Promise<Task[]> {
-    return await db.select().from(tasks).where(eq(tasks.cujId, cujId));
+    return await db.select().from(schema.tasks).where(eq(schema.tasks.cujId, cujId));
   }
 
   async getTasksForReview(reviewId: number): Promise<TaskWithCategory[]> {
