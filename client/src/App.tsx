@@ -118,10 +118,8 @@ function Router() {
               <PrivateRoute component={ReportView} {...props} />
             } />
             
-            {/* Media Test route */}
-            <Route path="/media-test" component={(props) => 
-              <PrivateRoute component={MediaTestPage} {...props} />
-            } />
+            {/* Media Test route - not requiring authentication for test purposes */}
+            <Route path="/media-test" component={MediaTestPage} />
             
             {/* Admin routes */}
             <Route path="/admin" component={(props) => 
