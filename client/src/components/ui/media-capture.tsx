@@ -390,43 +390,28 @@ export function MediaCapture({
           const mediaRecorder = new MediaRecorder(stream, options);
           mediaRecorderRef.current = mediaRecorder;
           
-          // Set up data handling to always collect chunks
+          // Set up data handling for future recording
+          // Only request data when the recording is stopped, not continuously
           mediaRecorder.ondataavailable = (event) => {
-            console.log(`Data available: ${event.data?.size || 0} bytes`);
             if (event.data && event.data.size > 0) {
+              console.log(`Data available: ${event.data.size} bytes`);
               recordedChunksRef.current.push(event.data);
             }
           };
           
           // Handle recording stop event - this is triggered when stop() is called
           mediaRecorder.onstop = () => {
-            const now = new Date().toISOString();
-            console.log(`MediaRecorder onstop at ${now} with ${recordedChunksRef.current.length} chunks`);
-            
-            // Reset recording flag but keep camera view open
-            setIsRecording(false);
-            
-            // In regular functioning, there should be chunks here
-            // If not, the recorder was probably stopped too quickly
-            if (recordedChunksRef.current.length === 0) {
-              console.log("No chunks collected on stop - creating a dummy chunk to ensure we have data");
-              
-              // If we don't have any chunks, create a dummy video file
-              // This is a 1x1 pixel webm video that's valid but very small (green screen)
-              const dummyBase64 = "GkXfo59ChoEBQveBAULygQRC84EIQoKIbWF0cm9za2FCh4EEQoWBAkKFgQIYU4BnQI0VSalmQCgq17FAAw9CQE2AQAZ3aGFtbXlXQUAIIAgAgC/+/8DwUORm5f3UqA7/XQA=";
-              const dummyArrayBuffer = Uint8Array.from(atob(dummyBase64), c => c.charCodeAt(0));
-              const dummyBlob = new Blob([dummyArrayBuffer], { type: 'video/webm' });
-              
-              recordedChunksRef.current.push(dummyBlob);
-              console.log("Added dummy chunk to prevent failure");
+            console.log("MediaRecorder stopped, processing video");
+            // Only process if we actually have some data and are in recording state
+            if (recordedChunksRef.current.length > 0 && isRecording) {
+              processVideoRecording().catch(error => {
+                console.error("Error in video processing:", error);
+                setIsRecording(false);
+              });
+            } else {
+              console.log("MediaRecorder stopped but no data collected or not in recording state");
+              setIsRecording(false);
             }
-            
-            // Process the video but DO NOT close the camera view
-            // We want to keep the camera open for potential additional recordings
-            processVideoRecording().catch(error => {
-              console.error("Error in video processing:", error);
-              // Just reset the recording state, not the camera view
-            });
           };
           
           mediaRecorder.onerror = (err) => {
@@ -488,7 +473,7 @@ export function MediaCapture({
         throw new Error("No video data recorded");
       }
       
-      // Set loading state 
+      // Set loading state
       setIsLoading(true);
       
       console.log("Processing recorded video chunks:", recordedChunksRef.current.length);
@@ -523,14 +508,9 @@ export function MediaCapture({
       const updatedMediaWithTemp = [...media, tempItem];
       onChange(updatedMediaWithTemp);
       
-      // We need to reset camera mode to null here but will reactivate it after upload
-      const currentFacingMode = facingMode; // Save current facing mode
-      setCameraMode(null);
-      
       toast({
         title: "Video captured",
-        description: "Uploading to server...",
-        duration: 3000
+        description: "Uploading to server..."
       });
       
       // Upload the video to the server
@@ -569,9 +549,8 @@ export function MediaCapture({
           onChange(finalUpdatedMedia);
           
           toast({
-            title: "Video uploaded",
-            description: "Video has been saved. Reopening camera.",
-            duration: 2000
+            title: "Video captured",
+            description: "Video has been saved to the server."
           });
         } else {
           console.error("Failed to find temporary item in media array");
@@ -579,25 +558,26 @@ export function MediaCapture({
           onChange([...media, mediaItem]);
         }
         
-        console.log("Video successfully processed and uploaded");
+        console.log("Video successfully processed and uploaded, returning to gallery view");
         
-        // IMPORTANT NEW APPROACH: 
-        // Instead of trying to keep the camera view open (which isn't working),
-        // we'll re-open it after a short delay
-        setTimeout(() => {
-          if (media.length + 1 < maxItems) { // +1 because we just added one
-            console.log("Re-activating camera after successful upload");
-            // Re-activate camera with the same mode
-            setFacingMode(currentFacingMode);
-            switchCameraMode('video');
-          }
-        }, 500);
+        // First stop all media tracks properly
+        if (mediaStreamRef.current) {
+          console.log("Stopping media tracks after successful upload");
+          mediaStreamRef.current.getTracks().forEach(track => {
+            console.log(`Stopping track: ${track.kind}`);
+            track.stop();
+          });
+          mediaStreamRef.current = null;
+        }
         
+        // Then reset camera mode to avoid React state updates during navigation
+        console.log("Setting camera mode to null");
+        setCameraMode(null);
       } catch (uploadError) {
         console.error("Video upload error:", uploadError);
         toast({
           title: "Video upload failed",
-          description: "Failed to upload the video.",
+          description: "Failed to upload the video. Please try again.",
           variant: "destructive"
         });
         
@@ -608,174 +588,50 @@ export function MediaCapture({
         // Revoke the URL
         revokeSafeObjectURL(tempItem.url);
         
-        // Also reopen the camera after error
-        setTimeout(() => {
-          if (media.length < maxItems) {
-            console.log("Re-activating camera after upload error");
-            setFacingMode(currentFacingMode);
-            switchCameraMode('video');
-          }
-        }, 500);
+        // Don't stop camera on error - just reset the recording state
+        setIsRecording(false);
       }
     } catch (error) {
       console.error("Video processing error:", error);
       toast({
         title: "Video processing failed",
-        description: "Failed to process the video. Reopening camera.",
+        description: "Failed to process the video. Please try again.",
         variant: "destructive"
       });
       
-      // Also reopen the camera after processing error
-      setTimeout(() => {
-        if (media.length < maxItems) {
-          switchCameraMode('video');
-        }
-      }, 500);
+      // Don't stop camera on error - just reset the recording state
+      setIsRecording(false);
     } finally {
       // Reset recorder state
       recordedChunksRef.current = [];
       mediaRecorderRef.current = null;
       setIsLoading(false);
-      setIsRecording(false);
-    }
-  };
-
-  // Function to run a test recording process
-  const testVideoRecording = async () => {
-    try {
-      console.log("===== TEST VIDEO RECORDING STARTED =====");
-      
-      // First get media stream
-      console.log("1. Requesting media stream...");
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: 320, height: 240 },
-        audio: true
-      });
-      console.log("Media stream acquired successfully");
-      
-      // Set up MediaRecorder
-      console.log("2. Creating MediaRecorder...");
-      const options = { mimeType: 'video/webm' };
-      const mediaRecorder = new MediaRecorder(stream, options);
-      console.log("MediaRecorder created with state:", mediaRecorder.state);
-      
-      // Set up data handling
-      const recordedChunks: Blob[] = [];
-      mediaRecorder.ondataavailable = (event) => {
-        console.log(`3. Data available event fired with size: ${event.data?.size || 0} bytes`);
-        if (event.data && event.data.size > 0) {
-          recordedChunks.push(event.data);
-          console.log("Added chunk, total chunks:", recordedChunks.length);
-        }
-      };
-      
-      // Set up stop handling
-      mediaRecorder.onstop = () => {
-        console.log("4. MediaRecorder stopped with", recordedChunks.length, "chunks");
-        if (recordedChunks.length > 0) {
-          console.log("Processing", recordedChunks.length, "chunks");
-          const blob = new Blob(recordedChunks, { type: 'video/webm' });
-          console.log("5. Created blob of size:", blob.size);
-          
-          // Clean up
-          stream.getTracks().forEach(track => track.stop());
-          console.log("6. All tracks stopped");
-        } else {
-          console.log("No chunks collected");
-        }
-        console.log("===== TEST VIDEO RECORDING COMPLETED =====");
-      };
-      
-      // Start recording with timeslice
-      console.log("Starting test recording...");
-      mediaRecorder.start(1000);
-      
-      // Wait 5 seconds
-      console.log("Waiting 5 seconds...");
-      await new Promise(resolve => setTimeout(resolve, 5000));
-      
-      // Stop recording
-      console.log("Stopping test recording...");
-      mediaRecorder.stop();
-      
-    } catch (error) {
-      console.error("Test recording error:", error);
     }
   };
 
   const startRecording = () => {
     try {
-      // Only start if we have a valid recorder and we're not already recording
       if (mediaRecorderRef.current && !isRecording) {
-        const startTime = new Date().toISOString();
-        console.log(`Starting recording at ${startTime}`);
-        console.log("MediaRecorder state before start:", mediaRecorderRef.current.state);
+        console.log("Starting recording with MediaRecorder");
         
-        // Clear any previous recordings
+        // Make sure recorded chunks are empty before starting a new recording
         recordedChunksRef.current = [];
         
-        // Set recording flag first to prevent multiple starts
-        setIsRecording(true);
+        // Start recording WITHOUT a timeslice parameter, but explicitly request data
+        // on stop
+        mediaRecorderRef.current.start();
         
-        // Add multiple safety measures to ensure we get data
-        
-        // Immediate request for data just in case
-        try {
-          if (typeof mediaRecorderRef.current.requestData === 'function') {
-            setTimeout(() => {
-              if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-                console.log("Requesting initial data point");
-                mediaRecorderRef.current.requestData();
-              }
-            }, 100);
+        // Explicitly request data when recording stops
+        mediaRecorderRef.current.addEventListener('stop', () => {
+          console.log("Adding stop event listener to explicitly request data");
+          // This ensures data is available even if the browser doesn't automatically trigger it
+          if (mediaRecorderRef.current && typeof mediaRecorderRef.current.requestData === 'function') {
+            mediaRecorderRef.current.requestData();
           }
-        } catch (reqErr) {
-          console.warn("Error requesting initial data:", reqErr);
-        }
-        
-        // Start recording with a slightly larger timeslice parameter (1000ms)
-        // to allow chunks to build up more substantially
-        console.log("STARTING RECORDING WITH TIMESLICE: 1000ms");
-        mediaRecorderRef.current.start(1000);
-        console.log("MediaRecorder state after start:", mediaRecorderRef.current.state);
-        
-        // Log the tracks to verify what we're recording
-        if (mediaStreamRef.current) {
-          const tracks = mediaStreamRef.current.getTracks();
-          console.log("ACTIVE TRACKS IN STREAM:", tracks.length);
-          tracks.forEach((track, i) => {
-            console.log(`TRACK ${i}: kind=${track.kind}, enabled=${track.enabled}, readyState=${track.readyState}, id=${track.id}`);
-          });
-        }
-        
-        // Multiple safety timeouts to ensure we get data throughout recording
-        const requestDataIntervals = [250, 500, 1000, 2000];
-        
-        requestDataIntervals.forEach(delay => {
-          setTimeout(() => {
-            if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-              try {
-                console.log(`Explicitly requesting data via timeout after ${delay}ms`);
-                mediaRecorderRef.current.requestData();
-              } catch (err) {
-                console.warn(`Error in safety timeout requestData (${delay}ms):`, err);
-              }
-            }
-          }, delay);
         });
         
-        // If we still have no chunks after a few seconds, force getting at least a dummy frame
-        setTimeout(() => {
-          if (recordedChunksRef.current.length === 0 && mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-            console.log("CRITICAL: No chunks collected after 3s - forcing stop and dummy data");
-            // Stop the recorder since it's not working
-            try {
-              mediaRecorderRef.current.stop();
-            } catch (stopErr) {
-              console.warn("Error stopping non-functional recorder:", stopErr);
-            }
-          }
-        }, 3000);
+        // Update UI state
+        setIsRecording(true);
         
         toast({
           title: "Recording video",
@@ -783,24 +639,12 @@ export function MediaCapture({
         });
       } else {
         console.warn("Can't start recording - MediaRecorder not ready or already recording");
-        
-        // If there's no recorder, try to reinitialize the camera
         if (!mediaRecorderRef.current) {
-          console.log("No MediaRecorder found, reinitializing video preview");
-          toast({
-            title: "Preparing camera",
-            description: "Please wait...",
-          });
-          
+          // Try to reinitialize video preview instead of auto-recording
           initializeVideoPreview().catch(error => {
             console.error("Failed to re-initialize video preview:", error);
+            // On critical error, close camera view
             setCameraMode(null);
-            
-            toast({
-              title: "Camera error",
-              description: "Could not initialize the camera. Please try again.",
-              variant: "destructive"
-            });
           });
         }
       }
@@ -817,78 +661,88 @@ export function MediaCapture({
   const stopRecording = () => {
     console.log("stopRecording called, isRecording:", isRecording, "mediaRecorderRef exists:", !!mediaRecorderRef.current);
     
-    // First reset recording state to prevent UI confusion
-    setIsRecording(false);
-    
-    try {      
-      // Check if we have a MediaRecorder
+    try {
+      // First reset recording state to prevent UI confusion
+      setIsRecording(false);
+      
+      // Then try to properly stop the recording
       if (mediaRecorderRef.current) {
-        console.log("Stopping MediaRecorder with state:", mediaRecorderRef.current.state);
-        
-        // Only request data if the MediaRecorder is still active
-        if (mediaRecorderRef.current.state === 'recording' && typeof mediaRecorderRef.current.requestData === 'function') {
-          try {
+        console.log("Stopping MediaRecorder");
+        try {
+          // First explicitly request the data
+          if (typeof mediaRecorderRef.current.requestData === 'function') {
             console.log("Explicitly requesting data before stopping");
             mediaRecorderRef.current.requestData();
-          } catch (requestError) {
-            console.warn("Error requesting data:", requestError);
           }
-        }
-        
-        // Then stop the recorder only if it's still recording
-        if (mediaRecorderRef.current.state === 'recording') {
-          try {
-            // This will trigger the onstop event handler, which handles the recording
-            // We intentionally don't clean up resources here to keep the camera open
-            mediaRecorderRef.current.stop();
-            console.log("MediaRecorder stopped successfully - processing will begin soon");
-          } catch (stopError) {
-            console.error("Error stopping recorder:", stopError);
-            // Don't clean up resources here - we want to keep the camera preview
-            // Just null out the recorder so we can create a new one
-            mediaRecorderRef.current = null;
-          }
-        } else {
-          console.log("MediaRecorder already inactive");
-          // Just null out the recorder reference but don't stop the camera
+          
+          // Small delay to ensure the data is processed before stopping
+          setTimeout(() => {
+            if (mediaRecorderRef.current) {
+              mediaRecorderRef.current.stop();
+              console.log("MediaRecorder stopped successfully after data request");
+            }
+          }, 100);
+        } catch (stopError) {
+          console.error("Error stopping MediaRecorder:", stopError);
+          // If stopping fails, immediately clean up everything
+          recordedChunksRef.current = [];
           mediaRecorderRef.current = null;
+          
+          if (mediaStreamRef.current) {
+            console.log("Stopping all media tracks due to MediaRecorder stop error");
+            mediaStreamRef.current.getTracks().forEach(track => {
+              console.log(`Force stopping track: ${track.kind}`);
+              track.stop();
+            });
+            mediaStreamRef.current = null;
+          }
+          
+          // Reset camera mode
+          console.log("Resetting camera mode due to error");
+          setCameraMode(null);
+          
+          // Let user know about the error
+          toast({
+            title: "Recording error",
+            description: "Error while stopping recording. Media may not be saved.",
+            variant: "destructive"
+          });
         }
       } else {
         console.warn("MediaRecorder not available, nothing to stop");
+        
+        // Still clean up media stream just in case
+        if (mediaStreamRef.current) {
+          console.log("Stopping orphaned media tracks");
+          mediaStreamRef.current.getTracks().forEach(track => track.stop());
+          mediaStreamRef.current = null;
+        }
       }
     } catch (error) {
       console.error("Critical error in stopRecording:", error);
+      
+      // Safety cleanup in case of catastrophic error
+      if (mediaStreamRef.current) {
+        try {
+          console.log("Emergency media track cleanup");
+          mediaStreamRef.current.getTracks().forEach(track => track.stop());
+        } catch (cleanupError) {
+          console.error("Even cleanup failed:", cleanupError);
+        }
+        mediaStreamRef.current = null;
+      }
+      
+      mediaRecorderRef.current = null;
+      recordedChunksRef.current = [];
+      setIsRecording(false);
+      setCameraMode(null);
       
       toast({
         title: "Recording failed",
         description: "A critical error occurred. Please try again.",
         variant: "destructive"
       });
-      
-      // Just reset recording state but keep camera open
-      setIsRecording(false);
     }
-  };
-  
-  // Helper function to clean up all media resources
-  const cleanupMediaResources = () => {
-    // Stop all tracks in the media stream
-    if (mediaStreamRef.current) {
-      console.log("Cleaning up media tracks");
-      try {
-        mediaStreamRef.current.getTracks().forEach(track => {
-          console.log(`Stopping track: ${track.kind}`);
-          track.stop();
-        });
-      } catch (trackError) {
-        console.error("Error stopping tracks:", trackError);
-      }
-      mediaStreamRef.current = null;
-    }
-    
-    // Clear recorder
-    mediaRecorderRef.current = null;
-    recordedChunksRef.current = [];
   };
 
   const captureImage = async () => {
@@ -932,14 +786,12 @@ export function MediaCapture({
       const updatedMediaWithTemp = [...media, tempItem];
       onChange(updatedMediaWithTemp);
       
-      // We need to reset camera mode to null here but will reactivate it after upload
-      const currentFacingMode = facingMode; // Save current facing mode
+      // Reset camera state
       setCameraMode(null);
       
       toast({
         title: "Image captured",
-        description: "Uploading to server...",
-        duration: 3000
+        description: "Uploading to server..."
       });
       
       try {
@@ -979,48 +831,25 @@ export function MediaCapture({
           onChange(finalUpdatedMedia);
           
           toast({
-            title: "Image uploaded",
-            description: "Image has been saved. Reopening camera.",
-            duration: 2000
+            title: "Image captured",
+            description: "Image has been saved to the server."
           });
         } else {
           console.error("Failed to find temporary image in media array");
           // Just add the new permanent item
           onChange([...media, mediaItem]);
         }
-        
-        // IMPORTANT NEW APPROACH: 
-        // Instead of trying to keep the camera view open (which doesn't work),
-        // we'll re-open it after a short delay
-        setTimeout(() => {
-          if (media.length + 1 < maxItems) { // +1 because we just added one
-            console.log("Re-activating camera after successful image upload");
-            // Re-activate camera with the same mode
-            setFacingMode(currentFacingMode);
-            switchCameraMode('image');
-          }
-        }, 500);
-        
       } catch (uploadError) {
         console.error("Image upload error:", uploadError);
         toast({
           title: "Image upload failed",
-          description: "Failed to upload the image.",
+          description: "Failed to upload the image. Please try again.",
           variant: "destructive"
         });
         
         // Clean up the temporary item on error
         const cleanMediaArray = updatedMediaWithTemp.filter(item => item.id !== tempItem.id);
         onChange(cleanMediaArray);
-        
-        // Also reopen the camera after error
-        setTimeout(() => {
-          if (media.length < maxItems) {
-            console.log("Re-activating camera after image upload error");
-            setFacingMode(currentFacingMode);
-            switchCameraMode('image');
-          }
-        }, 500);
       }
     } catch (error) {
       console.error("Image capture error:", error);
@@ -1029,13 +858,6 @@ export function MediaCapture({
         description: "There was an error capturing the image.",
         variant: "destructive"
       });
-      
-      // Also reopen the camera after processing error
-      setTimeout(() => {
-        if (media.length < maxItems) {
-          switchCameraMode('image');
-        }
-      }, 500);
     } finally {
       setIsLoading(false);
     }
@@ -1059,14 +881,9 @@ export function MediaCapture({
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'video') => {
-    e.preventDefault(); // Prevent default form submission behavior
-    e.stopPropagation(); // Stop event propagation to prevent navigation
-    
     const files = e.target.files;
     if (!files?.length) return;
 
-    console.log(`File selected: ${files.length} ${type} files`);
-    
     try {
       setIsLoading(true);
       
@@ -1084,7 +901,6 @@ export function MediaCapture({
       
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        console.log(`Processing file ${i+1}: ${file.name}, size: ${file.size}, type: ${file.type}`);
         
         // Create a temporary object URL for immediate display
         const tempObjectUrl = URL.createObjectURL(file);
@@ -1098,14 +914,12 @@ export function MediaCapture({
         
         // Add temporary item to show immediate feedback
         newItems.push(tempItem);
-        console.log('Added temporary media item:', tempItem.id);
         
         // Prepare form data for upload
         const formData = new FormData();
         formData.append('file', file);
         
         try {
-          console.log(`Uploading ${type} to server...`);
           // Upload the file to the server
           const response = await fetch('/api/media/upload', {
             method: 'POST',
@@ -1118,7 +932,6 @@ export function MediaCapture({
           
           // Get the permanent media item from the server response
           const mediaItem: MediaItem = await response.json();
-          console.log('Received permanent media from server:', mediaItem);
           
           // Replace the temporary item with the permanent one
           const itemIndex = newItems.findIndex(item => item.id === tempItem.id);
@@ -1131,7 +944,6 @@ export function MediaCapture({
             
             // Replace with permanent item
             newItems[itemIndex] = mediaItem;
-            console.log('Replaced temporary item with permanent item');
           }
         } catch (uploadError) {
           console.error('File upload error:', uploadError);
@@ -1144,12 +956,7 @@ export function MediaCapture({
       }
       
       // Update media state with new items
-      console.log('Updating media with new items:', newItems.length);
       onChange([...media, ...newItems]);
-      toast({
-        title: `${type === 'image' ? 'Image' : 'Video'} uploaded`,
-        description: "Your media has been added successfully."
-      });
       
       // Reset the file input
       if (type === 'image' && fileInputRef.current) {
@@ -1158,7 +965,6 @@ export function MediaCapture({
         videoInputRef.current.value = '';
       }
     } catch (error) {
-      console.error('Error in handleFileChange:', error);
       toast({
         title: "Failed to process media",
         description: error instanceof Error ? error.message : "An unexpected error occurred",
@@ -1220,27 +1026,12 @@ export function MediaCapture({
 
   return (
     <div className={`space-y-4 ${className || ''}`}>
-      {/* Test button, hidden in production */}
-      {process.env.NODE_ENV === 'development' && cameraMode === null && (
-        <button
-          onClick={testVideoRecording}
-          className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded text-sm"
-        >
-          Run Test Recording
-        </button>
-      )}
-      
       {/* Hidden file inputs for fallback upload */}
       <input 
         type="file" 
         ref={fileInputRef}
         accept="image/*"
-        onChange={(e) => {
-          e.stopPropagation();
-          handleFileChange(e, 'image');
-          return false;
-        }}
-        onClick={(e) => e.stopPropagation()}
+        onChange={(e) => handleFileChange(e, 'image')}
         style={{ display: 'none' }}
         multiple
       />
@@ -1248,12 +1039,7 @@ export function MediaCapture({
         type="file" 
         ref={videoInputRef}
         accept="video/*"
-        onChange={(e) => {
-          e.stopPropagation();
-          handleFileChange(e, 'video');
-          return false;
-        }}
-        onClick={(e) => e.stopPropagation()}
+        onChange={(e) => handleFileChange(e, 'video')}
         style={{ display: 'none' }}
         multiple
       />
@@ -1392,13 +1178,7 @@ export function MediaCapture({
             variant="outline"
             size="lg"
             className="flex flex-col items-center justify-center h-24 py-2"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              if (fileInputRef.current) {
-                fileInputRef.current.click();
-              }
-            }}
+            onClick={() => fileInputRef.current?.click()}
             disabled={isLoading || media.length >= maxItems}
           >
             <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-1">
@@ -1411,13 +1191,7 @@ export function MediaCapture({
             variant="outline"
             size="lg"
             className="flex flex-col items-center justify-center h-24 py-2"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              if (videoInputRef.current) {
-                videoInputRef.current.click();
-              }
-            }}
+            onClick={() => videoInputRef.current?.click()}
             disabled={isLoading || media.length >= maxItems}
           >
             <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-1">
