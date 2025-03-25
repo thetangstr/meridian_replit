@@ -234,19 +234,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(404).json({ error: 'Review not found' });
     }
     
-    // Check if user has access to this review
-    if (req.user.role !== 'admin' && review.reviewerId !== req.user.id) {
+    // Check if user has access to this review (only admins can publish/unpublish)
+    const isPublishOperation = req.body.isPublished !== undefined;
+    
+    if (isPublishOperation && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Only administrators can publish or unpublish reviews' });
+    } else if (!isPublishOperation && req.user.role !== 'admin' && review.reviewerId !== req.user.id) {
       return res.status(403).json({ error: 'You do not have permission to update this review' });
     }
     
     try {
-      // Only allow updating the status
-      const { status } = req.body;
-      if (!status) {
-        return res.status(400).json({ error: 'Status is required' });
+      const updateData: { status?: string; isPublished?: boolean } = {};
+      
+      // Handle status updates
+      if (req.body.status) {
+        updateData.status = req.body.status;
       }
       
-      const updatedReview = await storage.updateReviewStatus(reviewId, status);
+      // Handle publish/unpublish (admin only - already checked above)
+      if (isPublishOperation) {
+        updateData.isPublished = req.body.isPublished;
+      }
+      
+      // Use the new updateReview method which tracks lastModifiedById
+      const updatedReview = await storage.updateReview(
+        reviewId, 
+        req.user.id, 
+        updateData
+      );
+      
       res.json(updatedReview);
     } catch (error) {
       res.status(400).json({ error: String(error) });
