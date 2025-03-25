@@ -606,14 +606,6 @@ export default function TaskEvaluationPage() {
                 
                 <div className="flex justify-end space-x-3">
                   <Button 
-                    type="button" 
-                    variant="outline" 
-                    onClick={handleSaveAsDraft}
-                    disabled={submitting || saveDraft.isPending}
-                  >
-                    {saveDraft.isPending ? "Saving..." : "Save as Draft"}
-                  </Button>
-                  <Button 
                     type="submit" 
                     disabled={submitting || submitEvaluation.isPending}
                   >

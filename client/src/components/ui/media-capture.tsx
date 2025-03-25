@@ -674,29 +674,6 @@ export function MediaCapture({
       {/* Camera mode selection buttons */}
       {cameraMode === null && (
         <div className="grid grid-cols-2 gap-4">
-          <div className="col-span-2 flex justify-center mb-2">
-            <div className="bg-muted inline-flex rounded-lg p-1">
-              <Button
-                variant={uploadType === 'image' ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => setUploadType('image')}
-                className="relative px-3"
-              >
-                <CameraIcon className="h-4 w-4 mr-2" />
-                Photo
-              </Button>
-              <Button
-                variant={uploadType === 'video' ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => setUploadType('video')}
-                className="relative px-3"
-              >
-                <Video className="h-4 w-4 mr-2" />
-                Video
-              </Button>
-            </div>
-          </div>
-          
           <Button 
             variant="outline"
             size="lg"
@@ -730,6 +707,29 @@ export function MediaCapture({
               {uploadType === 'image' ? 'Upload Photo' : 'Upload Video'}
             </span>
           </Button>
+          
+          <div className="col-span-2 flex justify-center mt-4">
+            <div className="bg-muted inline-flex rounded-lg p-1">
+              <Button
+                variant={uploadType === 'image' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setUploadType('image')}
+                className="relative px-3"
+              >
+                <CameraIcon className="h-4 w-4 mr-2" />
+                Photo
+              </Button>
+              <Button
+                variant={uploadType === 'video' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setUploadType('video')}
+                className="relative px-3"
+              >
+                <Video className="h-4 w-4 mr-2" />
+                Video
+              </Button>
+            </div>
+          </div>
         </div>
       )}
       
