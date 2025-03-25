@@ -3,6 +3,7 @@ import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import { ArrowLeft } from "lucide-react";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -10,9 +11,21 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { apiRequest } from "@/lib/queryClient";
-import { Task, TaskEvaluation, scoringScaleDescriptions } from "@shared/schema";
+import { Task as BaseTask, TaskEvaluation, scoringScaleDescriptions } from "@shared/schema";
 import { MediaCapture } from "@/components/ui/media-capture";
 import { useToast } from "@/hooks/use-toast";
+
+// Extend the base Task type to include the cuj property with category data
+type Task = BaseTask & { 
+  cuj?: { 
+    categoryId: number;
+    category?: { 
+      id: number;
+      name: string;
+      icon: string;
+    }
+  }
+};
 
 // Form validation schema
 const taskEvaluationSchema = z.object({
@@ -45,7 +58,19 @@ export default function TaskEvaluationPage() {
   });
   
   // Fetch all tasks for this review to find next task in the same category
-  const { data: tasksData, isLoading: isLoadingTasks } = useQuery<{ tasks: Array<Task & { cuj?: { categoryId: number } }>, completedTaskIds: number[] }>({
+  const { data: tasksData, isLoading: isLoadingTasks } = useQuery<{ 
+    tasks: Array<Task & { 
+      cuj?: { 
+        categoryId: number,
+        category?: { 
+          id: number,
+          name: string,
+          icon: string
+        } 
+      } 
+    }>, 
+    completedTaskIds: number[] 
+  }>({
     queryKey: [`/api/reviews/${reviewId}/tasks`],
   });
   
@@ -107,22 +132,32 @@ export default function TaskEvaluationPage() {
       queryClient.invalidateQueries({ queryKey: [`/api/reviews/${reviewId}/tasks`] });
       queryClient.invalidateQueries({ queryKey: [`/api/reviews/${reviewId}`] });
       
-      toast({
-        title: "Evaluation Saved",
-        description: "Your task evaluation has been successfully saved.",
-      });
-      
       // Find next task in the same category
       const nextTask = findNextTask();
+      const currentTaskData = tasksData?.tasks?.find(t => t.id === taskId);
+      const currentCategoryId = currentTaskData?.cuj?.categoryId;
+      const currentCategory = currentTaskData?.cuj?.category?.name || "this category";
       
+      // Show appropriate toast message based on what's happening next
       if (nextTask) {
+        toast({
+          title: "Evaluation Saved",
+          description: `Your evaluation has been saved. Moving to the next task in ${currentCategory}.`,
+        });
         // Encode the category ID so the review page knows which category to expand
-        setLocation(`/reviews/${reviewId}/tasks/${nextTask.id}?category=${nextTask.cuj?.categoryId || ''}`);
+        setTimeout(() => {
+          setLocation(`/reviews/${reviewId}/tasks/${nextTask.id}?category=${nextTask.cuj?.categoryId || ''}`);
+        }, 1000); // Short delay to let the user see the toast
       } else {
-        // Get the category ID from tasksData
-        const currentTaskData = tasksData?.tasks?.find(t => t.id === taskId);
-        const currentCategoryId = currentTaskData?.cuj?.categoryId;
-        setLocation(`/reviews/${reviewId}${currentCategoryId ? `?expandCategory=${currentCategoryId}` : ''}`);
+        toast({
+          title: "Category Complete!",
+          description: `You've completed all tasks in ${currentCategory}. Returning to review summary.`,
+          variant: "default",
+        });
+        // Return to review page with the current category expanded
+        setTimeout(() => {
+          setLocation(`/reviews/${reviewId}${currentCategoryId ? `?expandCategory=${currentCategoryId}` : ''}`);
+        }, 1000); // Short delay to let the user see the toast
       }
     },
     onError: (error) => {
@@ -240,6 +275,44 @@ export default function TaskEvaluationPage() {
             )}
             <p className="mt-1"><span className="font-medium">Expected Outcome:</span> {task.expectedOutcome}</p>
           </div>
+          
+          {/* Task progress indicator */}
+          {tasksData && tasksData.tasks && task.cuj?.categoryId && (
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <div className="flex justify-between items-center mb-2">
+                <h4 className="text-sm font-medium">Category Progress</h4>
+                {(() => {
+                  const categoryTasks = tasksData.tasks.filter(t => 
+                    t.cuj?.categoryId === task.cuj?.categoryId
+                  );
+                  const completedCount = categoryTasks.filter(t => 
+                    tasksData.completedTaskIds.includes(t.id)
+                  ).length;
+                  const totalCount = categoryTasks.length;
+                  const currentPosition = categoryTasks.findIndex(t => t.id === task.id) + 1;
+                  
+                  return (
+                    <span className="text-xs text-muted-foreground">
+                      Task {currentPosition} of {totalCount} in {task.cuj?.category?.name || "this category"}
+                    </span>
+                  );
+                })()}
+              </div>
+              
+              {(() => {
+                const categoryTasks = tasksData.tasks.filter(t => 
+                  t.cuj?.categoryId === task.cuj?.categoryId
+                );
+                const completedCount = categoryTasks.filter(t => 
+                  tasksData.completedTaskIds.includes(t.id)
+                ).length;
+                const totalCount = categoryTasks.length;
+                const progress = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
+                
+                return <Progress value={progress} className="h-2" />;
+              })()}
+            </div>
+          )}
         </CardContent>
       </Card>
       
