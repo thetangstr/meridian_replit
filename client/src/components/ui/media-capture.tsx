@@ -111,27 +111,57 @@ export function MediaCapture({
   }, []);
 
   const switchCameraMode = (mode: 'image' | 'video' | null) => {
+    console.log(`Switching camera mode: ${cameraMode} -> ${mode}`);
+    
     // If we're already in the selected mode, just turn it off
     if (mode === cameraMode) {
+      console.log("Same mode selected, stopping camera");
       stopCamera();
       return;
     }
     
-    // Stop any ongoing recording
+    // If we have an ongoing recording, stop it first
     if (isRecording) {
-      stopRecording();
+      console.log("Stopping active recording before mode switch");
+      try {
+        stopRecording();
+      } catch (error) {
+        console.error("Error stopping recording during mode switch:", error);
+      }
     }
     
-    // Stop any existing camera
-    stopCamera();
+    // Release any existing camera resources
+    console.log("Stopping any existing camera");
+    try {
+      // Clean up media resources
+      if (mediaStreamRef.current) {
+        console.log("Stopping media tracks:", mediaStreamRef.current.getTracks().length);
+        mediaStreamRef.current.getTracks().forEach(track => {
+          console.log(`Stopping track: ${track.kind}, enabled: ${track.enabled}, state: ${track.readyState}`);
+          track.stop();
+        });
+        mediaStreamRef.current = null;
+      }
+      
+      // Reset MediaRecorder if it exists
+      if (mediaRecorderRef.current) {
+        console.log("Cleaning up MediaRecorder reference");
+        mediaRecorderRef.current = null;
+      }
+    } catch (cleanupError) {
+      console.error("Error during camera cleanup:", cleanupError);
+    }
     
     // If we're turning off the camera, we're done
     if (mode === null) {
+      console.log("Setting camera mode to null");
+      setCameraMode(null);
       return;
     }
     
     // If camera isn't supported, use file input instead
     if (!cameraSupported) {
+      console.log("Camera not supported, using file input fallback");
       if (mode === 'image' && fileInputRef.current) {
         fileInputRef.current.click();
       } else if (mode === 'video' && videoInputRef.current) {
@@ -141,11 +171,26 @@ export function MediaCapture({
     }
     
     // Set the new camera mode
+    console.log(`Setting camera mode to: ${mode}`);
     setCameraMode(mode);
     
-    // For video mode, we need to set up video recording
+    // For video mode, we need to set up the preview but NOT start recording automatically
     if (mode === 'video') {
-      startVideoRecording();
+      console.log("Initializing video preview only");
+      // Use a try/catch to handle video preview setup errors
+      try {
+        // Start video preview but don't record yet
+        initializeVideoPreview();
+      } catch (error) {
+        console.error("Failed to initialize video preview:", error);
+        // Fallback to null mode if video initialization fails
+        setCameraMode(null);
+        toast({
+          title: "Camera error",
+          description: "Could not access camera. Please check permissions and try again.",
+          variant: "destructive"
+        });
+      }
     }
   };
 
@@ -280,6 +325,121 @@ export function MediaCapture({
     }
   };
 
+  // Initialize video preview without starting recording
+  const initializeVideoPreview = async () => {
+    console.log("Initializing video preview");
+    setIsLoading(true);
+    
+    try {
+      // Use extremely low-resolution settings to ensure stability
+      const constraints = {
+        video: {
+          facingMode,
+          width: { ideal: 320 },  // Very low resolution
+          height: { ideal: 240 },  // Very low resolution
+          frameRate: { ideal: 10 }  // Reduced framerate
+        },
+        audio: true
+      };
+      
+      // First stop any existing streams
+      if (mediaStreamRef.current) {
+        console.log("Stopping existing media tracks before new preview");
+        mediaStreamRef.current.getTracks().forEach(track => track.stop());
+        mediaStreamRef.current = null;
+      }
+      
+      console.log("Requesting media stream for preview");
+      
+      // Start just the preview without recording
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      mediaStreamRef.current = stream;
+      
+      // Set up video preview
+      if (videoRef.current) {
+        console.log("Setting video source");
+        videoRef.current.srcObject = stream;
+        try {
+          await videoRef.current.play();
+          console.log("Video preview started");
+        } catch (playErr) {
+          console.error("Error playing video preview:", playErr);
+        }
+      }
+      
+      // Check if MediaRecorder is supported (for future recording)
+      if (!('MediaRecorder' in window)) {
+        console.warn("MediaRecorder not supported in this browser");
+        toast({
+          title: "Limited recording support",
+          description: "Your browser may not fully support video recording."
+          // No variant specified, will use default
+        });
+      } else {
+        // Set up MediaRecorder but don't start it yet
+        try {
+          // Try to use the most basic, universally supported codec options
+          let options = {};
+          
+          if (MediaRecorder.isTypeSupported('video/webm')) {
+            options = { mimeType: 'video/webm' };
+            console.log("Using video/webm format");
+          }
+          
+          console.log("Creating (but not starting) MediaRecorder");
+          const mediaRecorder = new MediaRecorder(stream, options);
+          mediaRecorderRef.current = mediaRecorder;
+          
+          // Set up data handling for future recording
+          mediaRecorder.ondataavailable = (event) => {
+            if (event.data && event.data.size > 0) {
+              console.log(`Data available: ${event.data.size} bytes`);
+              recordedChunksRef.current.push(event.data);
+            }
+          };
+          
+          // Handle recording stop event
+          mediaRecorder.onstop = () => {
+            console.log("MediaRecorder stopped, processing video");
+            processVideoRecording().catch(error => {
+              console.error("Error in video processing:", error);
+              setIsRecording(false);
+            });
+          };
+          
+          mediaRecorder.onerror = (err) => {
+            console.error("MediaRecorder error:", err);
+            toast({
+              title: "Recording error",
+              description: "An error occurred during recording. Please try again.",
+              variant: "destructive"
+            });
+            setIsRecording(false);
+          };
+          
+          toast({
+            title: "Camera ready",
+            description: "Tap the red button to start recording.",
+          });
+        } catch (codecErr) {
+          console.error("Error setting up MediaRecorder:", codecErr);
+        }
+      }
+    } catch (error) {
+      console.error("Video preview setup error:", error);
+      toast({
+        title: "Camera access failed",
+        description: "Could not access your camera. Please check permissions.",
+        variant: "destructive"
+      });
+      
+      // Reset camera mode
+      setCameraMode(null);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Create safe URL wrapper functions with error handling
   function createSafeObjectURL(blob: Blob) {
     try {
@@ -391,8 +551,20 @@ export function MediaCapture({
           onChange([...media, mediaItem]);
         }
         
-        // Reset camera mode instead of stopping camera completely
-        // This allows the user to stay in the camera view
+        console.log("Video successfully processed and uploaded, returning to gallery view");
+        
+        // First stop all media tracks properly
+        if (mediaStreamRef.current) {
+          console.log("Stopping media tracks after successful upload");
+          mediaStreamRef.current.getTracks().forEach(track => {
+            console.log(`Stopping track: ${track.kind}`);
+            track.stop();
+          });
+          mediaStreamRef.current = null;
+        }
+        
+        // Then reset camera mode to avoid React state updates during navigation
+        console.log("Setting camera mode to null");
         setCameraMode(null);
       } catch (uploadError) {
         console.error("Video upload error:", uploadError);
@@ -449,8 +621,12 @@ export function MediaCapture({
       } else {
         console.warn("Can't start recording - MediaRecorder not ready or already recording");
         if (!mediaRecorderRef.current) {
-          // Try to reinitialize the video recording
-          startVideoRecording();
+          // Try to reinitialize video preview instead of auto-recording
+          initializeVideoPreview().catch(error => {
+            console.error("Failed to re-initialize video preview:", error);
+            // On critical error, close camera view
+            setCameraMode(null);
+          });
         }
       }
     } catch (error) {
@@ -464,28 +640,78 @@ export function MediaCapture({
   };
   
   const stopRecording = () => {
+    console.log("stopRecording called, isRecording:", isRecording, "mediaRecorderRef exists:", !!mediaRecorderRef.current);
+    
     try {
-      if (isRecording && mediaRecorderRef.current) {
-        console.log("Stopping recording with MediaRecorder");
-        mediaRecorderRef.current.stop();
-        setIsRecording(false);
-      } else {
-        console.warn("Can't stop recording - MediaRecorder not recording");
-      }
-    } catch (error) {
-      console.error("Error stopping recording:", error);
+      // First reset recording state to prevent UI confusion
       setIsRecording(false);
       
-      // In case of error, reinitialize
+      // Then try to properly stop the recording
+      if (mediaRecorderRef.current) {
+        console.log("Stopping MediaRecorder");
+        try {
+          mediaRecorderRef.current.stop();
+          console.log("MediaRecorder stopped successfully");
+        } catch (stopError) {
+          console.error("Error stopping MediaRecorder:", stopError);
+          // If stopping fails, immediately clean up everything
+          recordedChunksRef.current = [];
+          mediaRecorderRef.current = null;
+          
+          if (mediaStreamRef.current) {
+            console.log("Stopping all media tracks due to MediaRecorder stop error");
+            mediaStreamRef.current.getTracks().forEach(track => {
+              console.log(`Force stopping track: ${track.kind}`);
+              track.stop();
+            });
+            mediaStreamRef.current = null;
+          }
+          
+          // Reset camera mode
+          console.log("Resetting camera mode due to error");
+          setCameraMode(null);
+          
+          // Let user know about the error
+          toast({
+            title: "Recording error",
+            description: "Error while stopping recording. Media may not be saved.",
+            variant: "destructive"
+          });
+        }
+      } else {
+        console.warn("MediaRecorder not available, nothing to stop");
+        
+        // Still clean up media stream just in case
+        if (mediaStreamRef.current) {
+          console.log("Stopping orphaned media tracks");
+          mediaStreamRef.current.getTracks().forEach(track => track.stop());
+          mediaStreamRef.current = null;
+        }
+      }
+    } catch (error) {
+      console.error("Critical error in stopRecording:", error);
+      
+      // Safety cleanup in case of catastrophic error
       if (mediaStreamRef.current) {
-        mediaStreamRef.current.getTracks().forEach(track => track.stop());
+        try {
+          console.log("Emergency media track cleanup");
+          mediaStreamRef.current.getTracks().forEach(track => track.stop());
+        } catch (cleanupError) {
+          console.error("Even cleanup failed:", cleanupError);
+        }
         mediaStreamRef.current = null;
       }
       
-      // Attempt to recover by starting fresh
-      if (cameraMode === 'video') {
-        startVideoRecording();
-      }
+      mediaRecorderRef.current = null;
+      recordedChunksRef.current = [];
+      setIsRecording(false);
+      setCameraMode(null);
+      
+      toast({
+        title: "Recording failed",
+        description: "A critical error occurred. Please try again.",
+        variant: "destructive"
+      });
     }
   };
 
