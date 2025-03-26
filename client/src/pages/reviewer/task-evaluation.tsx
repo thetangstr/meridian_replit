@@ -149,7 +149,13 @@ export default function TaskEvaluationPage() {
       });
     },
     onSuccess: () => {
+      // Invalidate individual evaluation
       queryClient.invalidateQueries({ queryKey: [`/api/reviews/${reviewId}/tasks/${taskId}/evaluation`] });
+      
+      // Invalidate all task evaluations for this review (crucial for review detail page)
+      queryClient.invalidateQueries({ queryKey: [`/api/reviews/${reviewId}/task-evaluations`] });
+      
+      // Invalidate tasks and review
       queryClient.invalidateQueries({ queryKey: [`/api/reviews/${reviewId}/tasks`] });
       queryClient.invalidateQueries({ queryKey: [`/api/reviews/${reviewId}`] });
       
@@ -204,7 +210,11 @@ export default function TaskEvaluationPage() {
       });
     },
     onSuccess: () => {
+      // Invalidate individual evaluation
       queryClient.invalidateQueries({ queryKey: [`/api/reviews/${reviewId}/tasks/${taskId}/evaluation`] });
+      
+      // Invalidate all task evaluations for this review (crucial for review detail page)
+      queryClient.invalidateQueries({ queryKey: [`/api/reviews/${reviewId}/task-evaluations`] });
       
       toast({
         title: "Draft Saved",

@@ -581,8 +581,8 @@ export function MediaCapture({
             errorMessages={{
               noCameraAccessible: 'No camera available.',
               permissionDenied: 'Camera permission denied.',
-              switchCamera: 'Could not switch camera.',
-              capture: 'Could not capture photo.'
+              switchCamera: 'Could not switch camera.'
+              // Note: 'capture' is not a supported error message type in react-camera-pro
             }}
             errorComponent={({ error }: { error: string }) => (
               <div className="p-4 text-center text-red-500 flex flex-col items-center">
