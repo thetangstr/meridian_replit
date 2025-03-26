@@ -4,7 +4,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
+import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -17,8 +18,11 @@ import { useToast } from "@/hooks/use-toast";
 // Form validation schema
 const categoryEvaluationSchema = z.object({
   responsivenessScore: z.number().min(1).max(4),
+  responsivenessFeedback: z.string().optional(),
   writingScore: z.number().min(1).max(4),
+  writingFeedback: z.string().optional(),
   emotionalScore: z.number().min(1).max(4),
+  emotionalFeedback: z.string().optional(),
   media: z.any().optional(),
 });
 
@@ -51,19 +55,29 @@ export default function CategoryEvaluationPage() {
     resolver: zodResolver(categoryEvaluationSchema),
     defaultValues: {
       responsivenessScore: evaluation?.responsivenessScore ?? 3,
+      responsivenessFeedback: evaluation?.responsivenessFeedback ?? '',
       writingScore: evaluation?.writingScore ?? 3,
+      writingFeedback: evaluation?.writingFeedback ?? '',
       emotionalScore: evaluation?.emotionalScore ?? 3,
+      emotionalFeedback: evaluation?.emotionalFeedback ?? '',
       media: evaluation?.media ?? [],
     },
   });
+  
+  // Watch form values for conditional rendering
+  const watchResponsivenessScore = form.watch("responsivenessScore");
+  const watchWritingScore = form.watch("writingScore");
+  const watchEmotionalScore = form.watch("emotionalScore");
   
   // Submit evaluation mutation
   const submitEvaluation = useMutation({
     mutationFn: async (data: CategoryEvaluationFormValues) => {
       return await apiRequest(
-        evaluation ? 'PUT' : 'POST',
         `/api/reviews/${reviewId}/categories/${categoryId}/evaluation`,
-        data
+        {
+          method: evaluation ? 'PUT' : 'POST',
+          body: JSON.stringify(data)
+        }
       );
     },
     onSuccess: () => {
@@ -245,6 +259,26 @@ export default function CategoryEvaluationPage() {
                   </FormItem>
                 )}
               />
+              
+              {/* Render feedback field if score is 1 or 2 */}
+              {(watchResponsivenessScore === 1 || watchResponsivenessScore === 2) && (
+                <FormField
+                  control={form.control}
+                  name="responsivenessFeedback"
+                  render={({ field }) => (
+                    <FormItem className="mt-4">
+                      <FormLabel>Please provide details about the responsiveness issues</FormLabel>
+                      <FormControl>
+                        <Textarea placeholder="Describe the specific responsiveness issues you experienced..." {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        Your feedback will help identify and address system performance issues.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
             </CardContent>
           </Card>
           
@@ -298,6 +332,26 @@ export default function CategoryEvaluationPage() {
                   </FormItem>
                 )}
               />
+              
+              {/* Render feedback field if score is 1 or 2 */}
+              {(watchWritingScore === 1 || watchWritingScore === 2) && (
+                <FormField
+                  control={form.control}
+                  name="writingFeedback"
+                  render={({ field }) => (
+                    <FormItem className="mt-4">
+                      <FormLabel>Please provide details about the writing/text issues</FormLabel>
+                      <FormControl>
+                        <Textarea placeholder="Describe the specific writing, text, or language issues you found..." {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        Your feedback will help improve the text quality and readability.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
             </CardContent>
           </Card>
           
