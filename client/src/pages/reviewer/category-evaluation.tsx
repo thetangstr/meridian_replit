@@ -105,9 +105,11 @@ export default function CategoryEvaluationPage() {
   const saveDraft = useMutation({
     mutationFn: async (data: CategoryEvaluationFormValues) => {
       return await apiRequest(
-        evaluation ? 'PUT' : 'POST',
         `/api/reviews/${reviewId}/categories/${categoryId}/evaluation`,
-        data
+        {
+          method: evaluation ? 'PUT' : 'POST',
+          body: JSON.stringify(data)
+        }
       );
     },
     onSuccess: () => {
@@ -405,6 +407,26 @@ export default function CategoryEvaluationPage() {
                   </FormItem>
                 )}
               />
+              
+              {/* Render feedback field if score is 1 or 2 */}
+              {(watchEmotionalScore === 1 || watchEmotionalScore === 2) && (
+                <FormField
+                  control={form.control}
+                  name="emotionalFeedback"
+                  render={({ field }) => (
+                    <FormItem className="mt-4">
+                      <FormLabel>Please provide details about the emotional engagement issues</FormLabel>
+                      <FormControl>
+                        <Textarea placeholder="Describe what aspects affected your emotional response or satisfaction..." {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        Your feedback will help improve the overall user experience.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
             </CardContent>
           </Card>
           
