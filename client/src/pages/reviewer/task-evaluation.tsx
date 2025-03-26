@@ -143,11 +143,10 @@ export default function TaskEvaluationPage() {
   // Submit evaluation mutation
   const submitEvaluation = useMutation({
     mutationFn: async (data: TaskEvaluationFormValues) => {
-      return await apiRequest(
-        evaluation ? 'PUT' : 'POST',
-        `/api/reviews/${reviewId}/tasks/${taskId}/evaluation`,
-        data
-      );
+      return await apiRequest(`/api/reviews/${reviewId}/tasks/${taskId}/evaluation`, {
+        method: evaluation ? 'PUT' : 'POST',
+        body: JSON.stringify(data)
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/reviews/${reviewId}/tasks/${taskId}/evaluation`] });
@@ -199,11 +198,10 @@ export default function TaskEvaluationPage() {
   // Save as draft (same as submit but stay on page)
   const saveDraft = useMutation({
     mutationFn: async (data: TaskEvaluationFormValues) => {
-      return await apiRequest(
-        evaluation ? 'PUT' : 'POST',
-        `/api/reviews/${reviewId}/tasks/${taskId}/evaluation`,
-        data
-      );
+      return await apiRequest(`/api/reviews/${reviewId}/tasks/${taskId}/evaluation`, {
+        method: evaluation ? 'PUT' : 'POST',
+        body: JSON.stringify(data)
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/reviews/${reviewId}/tasks/${taskId}/evaluation`] });
