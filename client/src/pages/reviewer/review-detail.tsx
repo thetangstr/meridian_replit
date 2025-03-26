@@ -494,7 +494,7 @@ export default function ReviewDetail() {
                       <div className="flex items-center mt-1">
                         <span className="text-xs text-muted-foreground mr-1">Score:</span>
                         <span className={`text-xs font-medium ${getScoreTextColorClass(calculateCategoryScore(category.id))}`}>
-                          {formatScore(calculateCategoryScore(category.id))}
+                          {calculateCategoryScore(category.id)?.toFixed(1) || 'N/A'}
                         </span>
                       </div>
                     )}
@@ -530,27 +530,40 @@ export default function ReviewDetail() {
                     </div>
 
                     {/* Category evaluation results summary */}
-                    {categoryEvaluations[category.id] && (
+                    {categoryEvaluations && categoryEvaluations[category.id] && (
                       <div className="mb-4 p-3 bg-gray-100 rounded-md">
                         <div className="grid grid-cols-3 gap-4">
-                          <div>
-                            <div className="text-sm font-medium mb-1">Responsiveness</div>
-                            <div className={`text-lg font-bold ${getScoreTextColorClass((categoryEvaluations[category.id].responsivenessScore / 4) * 100)}`}>
-                              {categoryEvaluations[category.id].responsivenessScore}/4
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-sm font-medium mb-1">Writing</div>
-                            <div className={`text-lg font-bold ${getScoreTextColorClass((categoryEvaluations[category.id].writingScore / 4) * 100)}`}>
-                              {categoryEvaluations[category.id].writingScore}/4
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-sm font-medium mb-1">Emotional</div>
-                            <div className={`text-lg font-bold ${getScoreTextColorClass((categoryEvaluations[category.id].emotionalScore / 4) * 100)}`}>
-                              {categoryEvaluations[category.id].emotionalScore}/4
-                            </div>
-                          </div>
+                          {(() => {
+                            const evalData = categoryEvaluations[category.id];
+                            if (!evalData) return null;
+                            
+                            const respScore = evalData.responsivenessScore || 0;
+                            const writeScore = evalData.writingScore || 0;
+                            const emotionalScore = evalData.emotionalScore || 0;
+                            
+                            return (
+                              <>
+                                <div>
+                                  <div className="text-sm font-medium mb-1">Responsiveness</div>
+                                  <div className={`text-lg font-bold ${getScoreTextColorClass((respScore / 4) * 100)}`}>
+                                    {respScore || 'N/A'}/4
+                                  </div>
+                                </div>
+                                <div>
+                                  <div className="text-sm font-medium mb-1">Writing</div>
+                                  <div className={`text-lg font-bold ${getScoreTextColorClass((writeScore / 4) * 100)}`}>
+                                    {writeScore || 'N/A'}/4
+                                  </div>
+                                </div>
+                                <div>
+                                  <div className="text-sm font-medium mb-1">Emotional</div>
+                                  <div className={`text-lg font-bold ${getScoreTextColorClass((emotionalScore / 4) * 100)}`}>
+                                    {emotionalScore || 'N/A'}/4
+                                  </div>
+                                </div>
+                              </>
+                            );
+                          })()}
                         </div>
                       </div>
                     )}
