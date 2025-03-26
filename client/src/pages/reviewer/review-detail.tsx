@@ -510,9 +510,10 @@ export default function ReviewDetail() {
               
               {isExpanded && (
                 <div className="border-t border-gray-200">
-                  <div className="p-3 bg-gray-50 border-b border-gray-200">
-                    <div className="flex items-center justify-between">
-                      <h4 className="font-semibold text-sm">Tasks ({completedCount}/{categoryTasks.length})</h4>
+                  {/* Category evaluation display section */}
+                  <div className="p-4 bg-gray-50 border-b border-gray-200">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="font-semibold text-base">{category.name} Category</h4>
                       
                       {/* Category Evaluation Button - Moved higher in UI */}
                       <Button
@@ -524,8 +525,38 @@ export default function ReviewDetail() {
                         }}
                         className="bg-primary text-primary-foreground hover:bg-primary/90"
                       >
-                        Evaluate {category.name} Category
+                        Evaluate Category
                       </Button>
+                    </div>
+
+                    {/* Category evaluation results summary */}
+                    {categoryEvaluations[category.id] && (
+                      <div className="mb-4 p-3 bg-gray-100 rounded-md">
+                        <div className="grid grid-cols-3 gap-4">
+                          <div>
+                            <div className="text-sm font-medium mb-1">Responsiveness</div>
+                            <div className={`text-lg font-bold ${getScoreTextColorClass((categoryEvaluations[category.id].responsivenessScore / 4) * 100)}`}>
+                              {categoryEvaluations[category.id].responsivenessScore}/4
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-sm font-medium mb-1">Writing</div>
+                            <div className={`text-lg font-bold ${getScoreTextColorClass((categoryEvaluations[category.id].writingScore / 4) * 100)}`}>
+                              {categoryEvaluations[category.id].writingScore}/4
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-sm font-medium mb-1">Emotional</div>
+                            <div className={`text-lg font-bold ${getScoreTextColorClass((categoryEvaluations[category.id].emotionalScore / 4) * 100)}`}>
+                              {categoryEvaluations[category.id].emotionalScore}/4
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex items-center">
+                      <h4 className="font-semibold text-sm">Tasks ({completedCount}/{categoryTasks.length})</h4>
                     </div>
                   </div>
                   
