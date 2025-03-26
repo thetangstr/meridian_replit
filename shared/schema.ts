@@ -146,8 +146,11 @@ export const categoryEvaluations = pgTable("category_evaluations", {
   reviewId: integer("review_id").notNull().references(() => reviews.id),
   categoryId: integer("category_id").notNull().references(() => cujCategories.id),
   responsivenessScore: integer("responsiveness_score"), // 1-4
+  responsivenessFeedback: text("responsiveness_feedback"), // Feedback for low scores
   writingScore: integer("writing_score"), // 1-4
+  writingFeedback: text("writing_feedback"), // Feedback for low scores
   emotionalScore: integer("emotional_score"), // 1-4 (bonus)
+  emotionalFeedback: text("emotional_feedback"), // Feedback for low scores
   media: json("media").default([]), // Array of image/video URLs
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -157,8 +160,11 @@ export const insertCategoryEvaluationSchema = createInsertSchema(categoryEvaluat
   reviewId: true,
   categoryId: true,
   responsivenessScore: true,
+  responsivenessFeedback: true,
   writingScore: true,
+  writingFeedback: true,
   emotionalScore: true,
+  emotionalFeedback: true,
   media: true,
 });
 
