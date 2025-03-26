@@ -480,12 +480,25 @@ export default function ReviewDetail() {
           return (
             <Card key={category.id} className="overflow-hidden">
               <div 
-                className="p-4 cursor-pointer flex justify-between items-center"
+                className="p-4 cursor-pointer flex justify-between items-center bg-muted/30"
                 onClick={() => toggleCategoryExpand(category.id)}
               >
-                <div className="flex items-center">
-                  {getCategoryIcon(category.icon)}
-                  <h3 className="font-medium">{category.name}</h3>
+                <div className="flex items-center space-x-2">
+                  <div className="p-2 rounded-lg bg-primary/10">
+                    {getCategoryIcon(category.icon)}
+                  </div>
+                  <div>
+                    <h3 className="font-medium">{category.name}</h3>
+                    {/* Display category score if available */}
+                    {calculateCategoryScore(category.id) !== null && (
+                      <div className="flex items-center mt-1">
+                        <span className="text-xs text-muted-foreground mr-1">Score:</span>
+                        <span className={`text-xs font-medium ${getScoreTextColorClass(calculateCategoryScore(category.id))}`}>
+                          {formatScore(calculateCategoryScore(category.id))}
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className="flex items-center">
                   <span className="text-sm text-muted-foreground mr-2">
@@ -500,9 +513,19 @@ export default function ReviewDetail() {
                   <div className="p-3 bg-gray-50 border-b border-gray-200">
                     <div className="flex items-center justify-between">
                       <h4 className="font-semibold text-sm">Tasks ({completedCount}/{categoryTasks.length})</h4>
-                      <div className="text-xs text-muted-foreground">
-                        Each task requires ratings for: Doable (Yes/No), Usability (1-4), Visuals (1-4)
-                      </div>
+                      
+                      {/* Category Evaluation Button - Moved higher in UI */}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEvaluateCategory(category.id);
+                        }}
+                        className="bg-primary text-primary-foreground hover:bg-primary/90"
+                      >
+                        Evaluate {category.name} Category
+                      </Button>
                     </div>
                   </div>
                   
@@ -608,20 +631,7 @@ export default function ReviewDetail() {
                       </div>
                     ))
                   )}
-                  
-                  {/* Category Evaluation Button */}
-                  <div className="p-4 flex justify-center border-b border-gray-200">
-                    <Button
-                      variant="outline"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleEvaluateCategory(category.id);
-                      }}
-                      className="bg-primary text-primary-foreground hover:bg-primary/90"
-                    >
-                      Evaluate {category.name} Category Overall
-                    </Button>
-                  </div>
+
                 </div>
               )}
             </Card>
