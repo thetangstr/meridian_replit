@@ -12,7 +12,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { apiRequest } from "@/lib/queryClient";
 import { Task as BaseTask, TaskEvaluation as BaseTaskEvaluation, scoringScaleDescriptions } from "@shared/schema";
-import { MediaCapture } from "@/components/ui/media-capture";
+import { MediaCapture } from "@/components/ui/media-capture-new";
 import { useToast } from "@/hooks/use-toast";
 import { CSSTransition, TransitionGroup } from "react-transition-group";
 
