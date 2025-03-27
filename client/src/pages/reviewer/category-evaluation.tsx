@@ -54,13 +54,13 @@ export default function CategoryEvaluationPage() {
   const form = useForm<CategoryEvaluationFormValues>({
     resolver: zodResolver(categoryEvaluationSchema),
     defaultValues: {
-      responsivenessScore: evaluation?.responsivenessScore ?? 3,
-      responsivenessFeedback: evaluation?.responsivenessFeedback ?? '',
-      writingScore: evaluation?.writingScore ?? 3,
-      writingFeedback: evaluation?.writingFeedback ?? '',
-      emotionalScore: evaluation?.emotionalScore ?? 3,
-      emotionalFeedback: evaluation?.emotionalFeedback ?? '',
-      media: evaluation?.media ?? [],
+      responsivenessScore: evaluation?.responsivenessScore || undefined,
+      responsivenessFeedback: evaluation?.responsivenessFeedback || '',
+      writingScore: evaluation?.writingScore || undefined,
+      writingFeedback: evaluation?.writingFeedback || '',
+      emotionalScore: evaluation?.emotionalScore || undefined,
+      emotionalFeedback: evaluation?.emotionalFeedback || '',
+      media: evaluation?.media || [],
     },
   });
   
@@ -236,7 +236,7 @@ export default function CategoryEvaluationPage() {
                         </div>
                         <RadioGroup 
                           onValueChange={(value) => field.onChange(Number(value))} 
-                          defaultValue={field.value?.toString()}
+                          defaultValue={field.value ? field.value.toString() : undefined}
                           className="flex w-full justify-between"
                         >
                           {Object.entries(scoringScaleDescriptions.responsiveness).map(([value, { label, description }]) => (
@@ -309,7 +309,7 @@ export default function CategoryEvaluationPage() {
                         </div>
                         <RadioGroup 
                           onValueChange={(value) => field.onChange(Number(value))} 
-                          defaultValue={field.value?.toString()}
+                          defaultValue={field.value ? field.value.toString() : undefined}
                           className="flex w-full justify-between"
                         >
                           {Object.entries(scoringScaleDescriptions.writing).map(([value, { label, description }]) => (
@@ -382,7 +382,7 @@ export default function CategoryEvaluationPage() {
                         </div>
                         <RadioGroup 
                           onValueChange={(value) => field.onChange(Number(value))} 
-                          defaultValue={field.value?.toString()}
+                          defaultValue={field.value ? field.value.toString() : undefined}
                           className="flex w-full justify-between"
                         >
                           {Object.entries(scoringScaleDescriptions.emotional).map(([value, { label, description }]) => (
