@@ -232,31 +232,27 @@ export default function CategoryEvaluationPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormControl>
-                      <div className="flex flex-col space-y-4">
-                        <div className="flex justify-between w-full">
-                          {Object.entries(scoringScaleDescriptions.responsiveness).map(([value, { label }]) => (
-                            <div key={value} className="flex flex-col items-center">
-                              <span className="font-medium text-sm">{label}</span>
-                              <span className="text-xs">{value}</span>
-                            </div>
-                          ))}
-                        </div>
+                      <div className="flex flex-col space-y-8">
                         <RadioGroup 
                           onValueChange={(value) => field.onChange(Number(value))} 
                           defaultValue={field.value ? field.value.toString() : undefined}
-                          className="flex w-full justify-between"
+                          className="grid grid-cols-4 gap-2 w-full"
                         >
                           {Object.entries(scoringScaleDescriptions.responsiveness).map(([value, { label, description }]) => (
                             <div key={value} className="flex flex-col items-center">
+                              <div className="text-center mb-2">
+                                <span className="font-medium text-sm block">{label}</span>
+                                <span className="text-xs block">{value}</span>
+                              </div>
                               <RadioGroupItem value={value} id={`responsiveness-${value}`} 
-                                className={`w-10 h-10 rounded-full border-2 ${
+                                className={`w-12 h-12 rounded-full border-2 ${
                                   Number(value) === 1 ? 'border-score-poor bg-score-poor/20' : 
                                   Number(value) === 2 ? 'border-score-fair bg-score-fair/20' : 
                                   Number(value) === 3 ? 'border-score-good bg-score-good/20' : 
                                   'border-score-excellent bg-score-excellent/20'
                                 }`} 
                               />
-                              <div className="mt-2 w-32 text-center">
+                              <div className="mt-2 text-center">
                                 <p className="text-xs text-muted-foreground">{description}</p>
                               </div>
                             </div>
@@ -305,31 +301,27 @@ export default function CategoryEvaluationPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormControl>
-                      <div className="flex flex-col space-y-4">
-                        <div className="flex justify-between w-full">
-                          {Object.entries(scoringScaleDescriptions.writing).map(([value, { label }]) => (
-                            <div key={value} className="flex flex-col items-center">
-                              <span className="font-medium text-sm">{label}</span>
-                              <span className="text-xs">{value}</span>
-                            </div>
-                          ))}
-                        </div>
+                      <div className="flex flex-col space-y-8">
                         <RadioGroup 
                           onValueChange={(value) => field.onChange(Number(value))} 
                           defaultValue={field.value ? field.value.toString() : undefined}
-                          className="flex w-full justify-between"
+                          className="grid grid-cols-4 gap-2 w-full"
                         >
                           {Object.entries(scoringScaleDescriptions.writing).map(([value, { label, description }]) => (
                             <div key={value} className="flex flex-col items-center">
+                              <div className="text-center mb-2">
+                                <span className="font-medium text-sm block">{label}</span>
+                                <span className="text-xs block">{value}</span>
+                              </div>
                               <RadioGroupItem value={value} id={`writing-${value}`} 
-                                className={`w-10 h-10 rounded-full border-2 ${
+                                className={`w-12 h-12 rounded-full border-2 ${
                                   Number(value) === 1 ? 'border-score-poor bg-score-poor/20' : 
                                   Number(value) === 2 ? 'border-score-fair bg-score-fair/20' : 
                                   Number(value) === 3 ? 'border-score-good bg-score-good/20' : 
                                   'border-score-excellent bg-score-excellent/20'
                                 }`} 
                               />
-                              <div className="mt-2 w-32 text-center">
+                              <div className="mt-2 text-center">
                                 <p className="text-xs text-muted-foreground">{description}</p>
                               </div>
                             </div>
@@ -378,31 +370,27 @@ export default function CategoryEvaluationPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormControl>
-                      <div className="flex flex-col space-y-4">
-                        <div className="flex justify-between w-full">
-                          {Object.entries(scoringScaleDescriptions.emotional).map(([value, { label }]) => (
-                            <div key={value} className="flex flex-col items-center">
-                              <span className="font-medium text-sm">{label}</span>
-                              <span className="text-xs">{value}</span>
-                            </div>
-                          ))}
-                        </div>
+                      <div className="flex flex-col space-y-8">
                         <RadioGroup 
                           onValueChange={(value) => field.onChange(Number(value))} 
                           defaultValue={field.value ? field.value.toString() : undefined}
-                          className="flex w-full justify-between"
+                          className="grid grid-cols-4 gap-2 w-full"
                         >
                           {Object.entries(scoringScaleDescriptions.emotional).map(([value, { label, description }]) => (
                             <div key={value} className="flex flex-col items-center">
+                              <div className="text-center mb-2">
+                                <span className="font-medium text-sm block">{label}</span>
+                                <span className="text-xs block">{value}</span>
+                              </div>
                               <RadioGroupItem value={value} id={`emotional-${value}`} 
-                                className={`w-10 h-10 rounded-full border-2 ${
+                                className={`w-12 h-12 rounded-full border-2 ${
                                   Number(value) === 1 ? 'border-score-poor bg-score-poor/20' : 
                                   Number(value) === 2 ? 'border-score-fair bg-score-fair/20' : 
                                   Number(value) === 3 ? 'border-score-good bg-score-good/20' : 
                                   'border-score-excellent bg-score-excellent/20'
                                 }`} 
                               />
-                              <div className="mt-2 w-32 text-center">
+                              <div className="mt-2 text-center">
                                 <p className="text-xs text-muted-foreground">{description}</p>
                               </div>
                             </div>
