@@ -3,8 +3,16 @@ import { twMerge } from "tailwind-merge";
 import { 
   TaskEvaluation, 
   CategoryEvaluation, 
-  scoringScaleDescriptions 
+  scoringScaleDescriptions,
+  TaskEvaluationWithTask,
+  CategoryEvaluationWithCategory,
+  ReportWithReview,
+  ReviewWithDetails,
+  TaskWithCategory,
+  CujCategory,
+  Task
 } from "@shared/schema";
+import { saveAs } from 'file-saver';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -222,4 +230,316 @@ export function getUserInitials(name: string): string {
     .map(part => part.charAt(0).toUpperCase())
     .slice(0, 2)
     .join('');
+}
+
+// Export review data to CSV
+export function exportReviewToCSV(
+  review: ReviewWithDetails, 
+  taskEvaluations: TaskEvaluationWithTask[], 
+  categoryEvaluations: CategoryEvaluationWithCategory[]
+): void {
+  // Format headers
+  const headers = [
+    'Category',
+    'CUJ',
+    'Task',
+    'Completed',
+    'Task Doable',
+    'Usability Score',
+    'Visuals Score',
+    'Task Score',
+    'Task Feedback'
+  ];
+
+  // Group tasks by category for easier processing
+  const categoriesMap: Record<number, { 
+    category: CujCategory, 
+    tasks: TaskEvaluationWithTask[] 
+  }> = {};
+
+  // Organize task evaluations by category
+  taskEvaluations.forEach(taskEval => {
+    const categoryId = taskEval.task.cuj.categoryId;
+    
+    if (!categoriesMap[categoryId]) {
+      categoriesMap[categoryId] = {
+        category: taskEval.task.cuj.category,
+        tasks: []
+      };
+    }
+    
+    categoriesMap[categoryId].tasks.push(taskEval);
+  });
+
+  // Get all evaluation data rows
+  const rows: string[][] = [];
+
+  // Process each category and its tasks
+  Object.values(categoriesMap).forEach(({ category, tasks }) => {
+    // Find category evaluation
+    const categoryEval = categoryEvaluations.find(c => c.categoryId === category.id);
+    
+    // Add category level information
+    if (categoryEval) {
+      rows.push([
+        `${category.name}`,
+        'Category Evaluation',
+        'Overall Assessment',
+        'Yes',
+        'N/A',
+        `Responsiveness: ${categoryEval.responsivenessScore}/4`,
+        `Writing: ${categoryEval.writingScore}/4`,
+        `Emotional: ${categoryEval.emotionalScore}/4`,
+        categoryEval.responsivenessScore !== null && categoryEval.responsivenessScore <= 2 ? categoryEval.responsivenessFeedback || 'No feedback' : 'N/A'
+      ]);
+    }
+    
+    // Add all tasks for this category
+    tasks.forEach(taskEval => {
+      const taskScore = calculateTaskScore(taskEval);
+      
+      rows.push([
+        category.name,
+        taskEval.task.cuj.name,
+        taskEval.task.name,
+        'Yes',
+        taskEval.doable ? 'Yes' : 'No',
+        `${taskEval.usabilityScore}/4`,
+        `${taskEval.visualsScore}/4`,
+        taskScore ? formatScore(taskScore) : 'N/A',
+        taskEval.usabilityScore && taskEval.usabilityScore <= 2 ? 
+          taskEval.usabilityFeedback || 'No feedback' : 'N/A'
+      ]);
+    });
+  });
+
+  // Convert to CSV format
+  const csvContent = [
+    headers.join(','),
+    ...rows.map(row => 
+      row.map(cell => 
+        // Escape quotes and wrap in quotes to handle commas in content
+        `"${String(cell).replace(/"/g, '""')}"`
+      ).join(',')
+    )
+  ].join('\n');
+
+  // Create and download the file
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' });
+  saveAs(blob, `${review.car.make}_${review.car.model}_Review_${new Date().toISOString().split('T')[0]}.csv`);
+}
+
+// Generate Google Docs export URL with data
+export function generateGoogleDocsExport(
+  report: ReportWithReview,
+  taskEvaluations: TaskEvaluationWithTask[],
+  categoryEvaluations: CategoryEvaluationWithCategory[]
+): string {
+  // Base Google Docs template URL
+  // We'll use a generic Google Docs create URL, and then populate it with our data
+  const baseUrl = 'https://docs.google.com/document/create';
+  
+  // Create a title for the document
+  const title = `${report.review.car.make} ${report.review.car.model} (${report.review.car.year}) Evaluation Report`;
+  
+  // Calculate scores by category
+  const categoryScores: Record<number, {
+    categoryName: string,
+    taskCount: number,
+    avgTaskScore: number,
+    categoryScore: number | null
+  }> = {};
+  
+  // Group tasks by category and calculate scores
+  taskEvaluations.forEach(taskEval => {
+    const categoryId = taskEval.task.cuj.categoryId;
+    const categoryName = taskEval.task.cuj.category?.name || 'Unknown';
+    
+    if (!categoryScores[categoryId]) {
+      categoryScores[categoryId] = {
+        categoryName,
+        taskCount: 0,
+        avgTaskScore: 0,
+        categoryScore: null
+      };
+    }
+    
+    const taskScore = calculateTaskScore(taskEval);
+    if (taskScore !== null) {
+      categoryScores[categoryId].avgTaskScore = 
+        (categoryScores[categoryId].avgTaskScore * categoryScores[categoryId].taskCount + taskScore) / 
+        (categoryScores[categoryId].taskCount + 1);
+      categoryScores[categoryId].taskCount += 1;
+    }
+  });
+  
+  // Add category evaluation scores
+  categoryEvaluations.forEach(catEval => {
+    if (categoryScores[catEval.categoryId]) {
+      const categoryEvalScore = calculateCategoryScore(
+        categoryScores[catEval.categoryId].avgTaskScore,
+        catEval
+      );
+      
+      categoryScores[catEval.categoryId].categoryScore = categoryEvalScore;
+    }
+  });
+  
+  // Format our document content with markdown-style syntax that Google Docs can interpret
+  const docContent = [
+    `# ${title}`,
+    `\nEvaluation Date: ${formatDateTime(report.review.updatedAt || report.review.createdAt)}`,
+    `\nReviewer: ${report.review.reviewer.name}`,
+    
+    '\n## Overall Assessment',
+    `\nOverall Score: ${formatScore(report.overallScore || 0)}/100`,
+    
+    '\n## Top Highlights',
+    report.topLikes ? `\n${report.topLikes}` : '\nNo highlights recorded',
+    
+    '\n## Areas for Improvement',
+    report.topHates ? `\n${report.topHates}` : '\nNo improvement areas recorded',
+    
+    '\n## Category Scores',
+    ...Object.values(categoryScores).map(cat => 
+      `\n### ${cat.categoryName}: ${formatScore(cat.categoryScore || 0)}/100`
+    ),
+    
+    '\n## Task Evaluations',
+    ...taskEvaluations.map(taskEval => {
+      const taskScore = calculateTaskScore(taskEval);
+      return [
+        `\n### ${taskEval.task.name}`,
+        `\nCategory: ${taskEval.task.cuj.category?.name || 'Unknown'}`,
+        `\nCUJ: ${taskEval.task.cuj.name}`,
+        `\nDoable: ${taskEval.doable ? 'Yes' : 'No'}`,
+        `\nUsability Score: ${taskEval.usabilityScore}/4`,
+        `\nVisuals Score: ${taskEval.visualsScore}/4`,
+        `\nTask Score: ${taskScore ? formatScore(taskScore) : 'N/A'}/100`,
+        taskEval.usabilityScore && taskEval.usabilityScore <= 2 && taskEval.usabilityFeedback ? 
+          `\nFeedback: ${taskEval.usabilityFeedback}` : ''
+      ].join('');
+    }),
+    
+    '\n## Category Evaluations',
+    ...categoryEvaluations.map(catEval => [
+      `\n### ${catEval.category.name}`,
+      `\nResponsiveness Score: ${catEval.responsivenessScore}/4`,
+      `\nWriting Score: ${catEval.writingScore}/4`,
+      `\nEmotional Score: ${catEval.emotionalScore}/4`,
+      catEval.responsivenessScore !== null && catEval.responsivenessScore <= 2 && catEval.responsivenessFeedback ?
+        `\nFeedback: ${catEval.responsivenessFeedback}` : ''
+    ].join(''))
+  ].join('\n');
+  
+  // Encode the content for URL
+  const encodedContent = encodeURIComponent(docContent);
+  
+  // Return the complete URL for Google Docs with our data
+  return `${baseUrl}?title=${encodeURIComponent(title)}&body=${encodedContent}`;
+}
+
+// Export review data to Google Spreadsheet format
+export function exportReviewToGoogleSheets(
+  review: ReviewWithDetails,
+  taskEvaluations: TaskEvaluationWithTask[],
+  categoryEvaluations: CategoryEvaluationWithCategory[]
+): string {
+  // Base Google Sheets URL for creating a new spreadsheet
+  const baseUrl = 'https://docs.google.com/spreadsheets/create';
+  
+  // Create title for the spreadsheet
+  const title = `${review.car.make} ${review.car.model} (${review.car.year}) Evaluation Data`;
+  
+  // Format the data as TSV (Tab-Separated Values)
+  const headers = [
+    'Category',
+    'CUJ',
+    'Task',
+    'Completed',
+    'Task Doable',
+    'Usability Score',
+    'Visuals Score',
+    'Task Score',
+    'Task Feedback'
+  ];
+  
+  // Build rows similar to CSV export
+  const rows: string[][] = [];
+  
+  // Group tasks by category
+  const categoriesMap: Record<number, {
+    category: CujCategory,
+    tasks: TaskEvaluationWithTask[]
+  }> = {};
+  
+  // Organize task evaluations by category
+  taskEvaluations.forEach(taskEval => {
+    const categoryId = taskEval.task.cuj.categoryId;
+    
+    if (!categoriesMap[categoryId]) {
+      categoriesMap[categoryId] = {
+        category: taskEval.task.cuj.category,
+        tasks: []
+      };
+    }
+    
+    categoriesMap[categoryId].tasks.push(taskEval);
+  });
+  
+  // Process each category and its tasks
+  Object.values(categoriesMap).forEach(({ category, tasks }) => {
+    // Find category evaluation
+    const categoryEval = categoryEvaluations.find(c => c.categoryId === category.id);
+    
+    // Add category level information
+    if (categoryEval) {
+      rows.push([
+        `${category.name}`,
+        'Category Evaluation',
+        'Overall Assessment',
+        'Yes',
+        'N/A',
+        `Responsiveness: ${categoryEval.responsivenessScore}/4`,
+        `Writing: ${categoryEval.writingScore}/4`,
+        `Emotional: ${categoryEval.emotionalScore}/4`,
+        categoryEval.responsivenessScore !== null && categoryEval.responsivenessScore <= 2 ? categoryEval.responsivenessFeedback || 'No feedback' : 'N/A'
+      ]);
+    }
+    
+    // Add all tasks for this category
+    tasks.forEach(taskEval => {
+      const taskScore = calculateTaskScore(taskEval);
+      
+      rows.push([
+        category.name,
+        taskEval.task.cuj.name,
+        taskEval.task.name,
+        'Yes',
+        taskEval.doable ? 'Yes' : 'No',
+        `${taskEval.usabilityScore}/4`,
+        `${taskEval.visualsScore}/4`,
+        taskScore ? formatScore(taskScore) : 'N/A',
+        taskEval.usabilityScore && taskEval.usabilityScore <= 2 ? 
+          taskEval.usabilityFeedback || 'No feedback' : 'N/A'
+      ]);
+    });
+  });
+  
+  // Convert to TSV format
+  const tsvContent = [
+    headers.join('\t'),
+    ...rows.map(row => 
+      row.map(cell => 
+        // Escape tabs and newlines for TSV format
+        String(cell).replace(/\t/g, ' ').replace(/\n/g, ' ')
+      ).join('\t')
+    )
+  ].join('\n');
+  
+  // Create a parameter for Google Sheets
+  const encodedContent = encodeURIComponent(tsvContent);
+  
+  // Return the complete URL for Google Sheets with our data
+  return `${baseUrl}?title=${encodeURIComponent(title)}&content=${encodedContent}`;
 }

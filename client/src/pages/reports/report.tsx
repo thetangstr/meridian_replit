@@ -3,16 +3,25 @@ import { useParams, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Download, Share } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { ArrowLeft, ChevronDown, Download, FileSpreadsheet, Share, FileText } from "lucide-react";
 import { ScorePill } from "@/components/ui/score-pill";
 import { useAuth } from "@/lib/auth";
 import { canAccessInternalReports } from "@/lib/auth";
 import { 
   ReportWithReview, 
-  CujCategory 
+  CujCategory,
+  TaskEvaluationWithTask,
+  CategoryEvaluationWithCategory
 } from "@shared/schema";
-import { formatDateTime } from "@/lib/utils";
+import { 
+  formatDateTime, 
+  exportReviewToCSV, 
+  generateGoogleDocsExport, 
+  exportReviewToGoogleSheets 
+} from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
+import { useToast } from "@/hooks/use-toast";
 
 export default function ReportView() {
   const params = useParams();
@@ -31,10 +40,76 @@ export default function ReportView() {
     setExpandedCategory(current => current === categoryId ? null : categoryId);
   };
   
-  // Export report as PDF
-  const handleExportReport = () => {
-    // In a real implementation, this would generate and download a PDF
-    alert("PDF export functionality would be implemented here");
+  // Get additional data for exports
+  const { data: taskEvaluations = [] } = useQuery<TaskEvaluationWithTask[]>({
+    queryKey: [`/api/reviews/${report?.review.id}/task-evaluations`],
+    enabled: !!report?.review.id
+  });
+  
+  const { data: categoryEvaluations = [] } = useQuery<CategoryEvaluationWithCategory[]>({
+    queryKey: [`/api/reviews/${report?.review.id}/category-evaluations`],
+    enabled: !!report?.review.id
+  });
+  
+  const { toast } = useToast();
+  
+  // Export report as CSV
+  const handleExportCSV = () => {
+    if (!report) return;
+    try {
+      exportReviewToCSV(report.review, taskEvaluations, categoryEvaluations);
+      toast({
+        title: "Export Complete",
+        description: "Your CSV file has been downloaded.",
+      });
+    } catch (error) {
+      toast({
+        title: "Export Failed",
+        description: "Could not generate the CSV file. Please try again.",
+        variant: "destructive"
+      });
+      console.error("CSV export error:", error);
+    }
+  };
+  
+  // Export to Google Docs 
+  const handleExportGoogleDocs = () => {
+    if (!report) return;
+    try {
+      const url = generateGoogleDocsExport(report, taskEvaluations, categoryEvaluations);
+      window.open(url, '_blank');
+      toast({
+        title: "Export Initiated",
+        description: "Google Docs should open in a new tab.",
+      });
+    } catch (error) {
+      toast({
+        title: "Export Failed",
+        description: "Could not open Google Docs. Please try again.",
+        variant: "destructive"
+      });
+      console.error("Google Docs export error:", error);
+    }
+  };
+  
+  // Export to Google Sheets
+  const handleExportGoogleSheets = () => {
+    if (!report) return;
+    try {
+      const url = exportReviewToGoogleSheets(report.review, taskEvaluations, categoryEvaluations);
+      window.open(url, '_blank');
+      toast({
+        title: "Export Initiated",
+        description: "Google Sheets should open in a new tab.",
+      });
+    } catch (error) {
+      toast({
+        title: "Export Failed",
+        description: "Could not open Google Sheets. Please try again.",
+        variant: "destructive"
+      });
+      console.error("Google Sheets export error:", error);
+    }
   };
   
   // Share report
@@ -109,10 +184,28 @@ export default function ReportView() {
           {report.review.car.make} {report.review.car.model} ({report.review.car.year}) Report
         </h2>
         <div className="hidden sm:flex space-x-3">
-          <Button variant="outline" onClick={handleExportReport}>
-            <Download className="mr-1 h-4 w-4" />
-            Export PDF
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline">
+                <Download className="mr-1 h-4 w-4" />
+                Export <ChevronDown className="ml-1 h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={handleExportCSV}>
+                <Download className="mr-2 h-4 w-4" />
+                CSV
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportGoogleSheets}>
+                <FileSpreadsheet className="mr-2 h-4 w-4" />
+                Google Sheets
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportGoogleDocs}>
+                <FileText className="mr-2 h-4 w-4" />
+                Google Docs
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button variant="outline" onClick={handleShareReport}>
             <Share className="mr-1 h-4 w-4" />
             Share
