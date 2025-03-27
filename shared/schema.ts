@@ -271,6 +271,11 @@ export type CategoryEvaluationWithCategory = CategoryEvaluation & {
   category: CujCategory;
 };
 
+export type Issue = {
+  category: string;
+  description: string;
+};
+
 export type ReportWithReview = Report & {
   review: ReviewWithDetails;
   categoryScores: Array<{
@@ -281,6 +286,7 @@ export type ReportWithReview = Report & {
     writingScore: number;
     emotionalScore: number;
   }>;
+  topIssues: Issue[];
 };
 
 export type MediaItem = {

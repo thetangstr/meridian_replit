@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
@@ -13,14 +13,9 @@ import {
   ReportWithReview, 
   CujCategory,
   TaskEvaluationWithTask,
-  CategoryEvaluationWithCategory
+  CategoryEvaluationWithCategory,
+  Issue
 } from "@shared/schema";
-
-// Define Issue type for report.topIssues
-interface Issue {
-  category: string;
-  description: string;
-}
 
 // No helper function needed anymore, we'll use direct conditional rendering
 import { 
@@ -42,7 +37,7 @@ export default function ReportView() {
   // Fetch report with review details
   const { data: report, isLoading } = useQuery<ReportWithReview>({
     queryKey: [`/api/reports/${reportId}`],
-  });
+  }) as { data: ReportWithReview | undefined, isLoading: boolean };
   
   // Toggle category expansion
   const toggleCategoryExpand = (categoryId: number) => {
@@ -323,7 +318,7 @@ export default function ReportView() {
             <div className="mt-6">
               <h4 className="font-medium mb-2">Top Three Issues</h4>
               <div className="space-y-2">
-                {report.topIssues.slice(0, 3).map((issue: { category: string; description: string }, index: number) => (
+                {report.topIssues.slice(0, 3).map((issue: Issue, index: number) => (
                   <div 
                     key={index} 
                     className={`${
@@ -435,7 +430,7 @@ export default function ReportView() {
           </div>
         </CardContent>
 
-        {canViewInternalContent && renderIfAuthenticated(
+        {canViewInternalContent && (
           <div className="border-t border-gray-200 p-4 flex justify-center">
             <Button variant="ghost" className="text-primary" onClick={handleViewFullReport}>
               <span>View full detailed report</span>
