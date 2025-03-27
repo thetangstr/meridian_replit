@@ -3,9 +3,13 @@ import { useLocation, useParams } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ChevronDown, ChevronRight, Navigation, Headphones, Phone, Settings, Check, X } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronRight, Navigation, Headphones, Phone, Settings, Check, X, Download, FileSpreadsheet, FileText } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { CujCategory, Task, Review, ReviewWithDetails, TaskEvaluation, CategoryEvaluation, Cuj } from "@shared/schema";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { exportReviewToCSV, generateGoogleDocsExport, exportReviewToGoogleSheets } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
+import FileSaver from "file-saver";
 
 // Extend Task type to include cuj relationship
 type TaskWithCuj = Task & {
@@ -50,6 +54,8 @@ export default function ReviewDetail() {
     const expandCategory = params.get('expandCategory');
     return expandCategory ? [parseInt(expandCategory)] : [];
   });
+  
+  const { toast } = useToast();
   
   // Also look for category parameter which is passed from task evaluation page
   useEffect(() => {
@@ -209,6 +215,168 @@ export default function ReviewDetail() {
   // Go to category evaluation
   const handleEvaluateCategory = (categoryId: number) => {
     setLocation(`/reviews/${reviewId}/categories/${categoryId}`);
+  };
+  
+  // Convert task evaluations map to array for export
+  const getTaskEvaluationsForExport = () => {
+    if (!taskEvaluationsData || !tasks || !tasks.tasks) return [];
+    
+    return taskEvaluationsData.map(taskEval => {
+      const task = tasks.tasks.find(t => t.id === taskEval.taskId);
+      if (!task) return null;
+      
+      // Create a properly typed TaskEvaluationWithTask object
+      return {
+        ...taskEval,
+        task: {
+          ...task,
+          cuj: task.cuj || { id: 0, name: 'Unknown', categoryId: 0, category: null }
+        }
+      } as any; // Use type assertion to avoid TypeScript errors
+    }).filter(item => item !== null) as any[]; // Filter out null values
+  };
+  
+  // Convert category evaluations to the proper format with category info
+  const getCategoryEvaluationsForExport = () => {
+    if (!categoryEvaluationsData || !categories) return [];
+    
+    return categoryEvaluationsData.map(catEval => {
+      const category = categories.find(cat => cat.id === catEval.categoryId);
+      // Add category information to each evaluation for export
+      return {
+        ...catEval,
+        category: category || { id: 0, name: 'Unknown', description: null, icon: null }
+      };
+    }) as any[]; // Type assertion to avoid TypeScript errors
+  };
+  
+  // Export to CSV
+  const handleExportCSV = () => {
+    if (!review) return;
+    
+    try {
+      const taskEvaluationsForExport = getTaskEvaluationsForExport();
+      const categoryEvals = getCategoryEvaluationsForExport();
+      
+      // Check if all tasks are completed
+      const isComplete = totalCompleted === totalTasks;
+      
+      if (!isComplete) {
+        // Show warning about incomplete data
+        const confirmed = window.confirm(
+          `This review is incomplete (${totalCompleted} of ${totalTasks} tasks completed). The export may contain partial data. Do you want to continue?`
+        );
+        
+        if (!confirmed) return;
+      }
+      
+      exportReviewToCSV(review, taskEvaluationsForExport, categoryEvals);
+      
+      toast({
+        title: "Export Successful",
+        description: `Data has been exported to CSV${!isComplete ? ' (incomplete)' : ''}.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Export Failed",
+        description: "Could not export to CSV. Please try again.",
+        variant: "destructive"
+      });
+      console.error("CSV export error:", error);
+    }
+  };
+  
+  // Export to Google Docs
+  const handleExportGoogleDocs = () => {
+    if (!review) return;
+    
+    try {
+      // Check if all tasks are completed
+      const isComplete = totalCompleted === totalTasks;
+      
+      if (!isComplete) {
+        // Show warning about incomplete data
+        const confirmed = window.confirm(
+          `This review is incomplete (${totalCompleted} of ${totalTasks} tasks completed). The export may contain partial data. Do you want to continue?`
+        );
+        
+        if (!confirmed) return;
+      }
+      
+      // Prepare "report" structure for the Google Docs export
+      const mockReport = {
+        id: 0,
+        reviewId: review.id,
+        summary: `${review.car.make} ${review.car.model} (${review.car.year}) Review${!isComplete ? ' - INCOMPLETE' : ''}`,
+        findings: !isComplete ? 'This is an incomplete review with partial data.' : '',
+        recommendations: '',
+        issues: [],
+        overallScore: null,
+        topLikes: null,
+        topHates: null,
+        benchmarkRank: null,
+        benchmarkComparison: null,
+        topIssues: [],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        review: review
+      } as any; // Type assertion to satisfy TypeScript
+      
+      const taskEvaluationsForExport = getTaskEvaluationsForExport();
+      const categoryEvals = getCategoryEvaluationsForExport();
+      
+      const url = generateGoogleDocsExport(mockReport, taskEvaluationsForExport, categoryEvals);
+      window.open(url, '_blank');
+      
+      toast({
+        title: "Export Initiated",
+        description: `Google Docs should open in a new tab${!isComplete ? ' (incomplete data)' : ''}.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Export Failed",
+        description: "Could not open Google Docs. Please try again.",
+        variant: "destructive"
+      });
+      console.error("Google Docs export error:", error);
+    }
+  };
+  
+  // Export to Google Sheets
+  const handleExportGoogleSheets = () => {
+    if (!review) return;
+    
+    try {
+      // Check if all tasks are completed
+      const isComplete = totalCompleted === totalTasks;
+      
+      if (!isComplete) {
+        // Show warning about incomplete data
+        const confirmed = window.confirm(
+          `This review is incomplete (${totalCompleted} of ${totalTasks} tasks completed). The export may contain partial data. Do you want to continue?`
+        );
+        
+        if (!confirmed) return;
+      }
+      
+      const taskEvaluationsForExport = getTaskEvaluationsForExport();
+      const categoryEvals = getCategoryEvaluationsForExport();
+      
+      const url = exportReviewToGoogleSheets(review, taskEvaluationsForExport, categoryEvals);
+      window.open(url, '_blank');
+      
+      toast({
+        title: "Export Initiated",
+        description: `Google Sheets should open in a new tab${!isComplete ? ' (incomplete data)' : ''}.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Export Failed", 
+        description: "Could not open Google Sheets. Please try again.",
+        variant: "destructive"
+      });
+      console.error("Google Sheets export error:", error);
+    }
   };
   
   // Get icon component for category
@@ -395,13 +563,38 @@ export default function ReviewDetail() {
   
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-20 sm:pb-6">
-      <div className="flex items-center mb-6">
-        <Button variant="ghost" className="mr-2" onClick={() => setLocation('/')}>
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <h2 className="text-2xl font-medium text-foreground">
-          {review.car.make} {review.car.model} ({review.car.year}) Review
-        </h2>
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center">
+          <Button variant="ghost" className="mr-2" onClick={() => setLocation('/')}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <h2 className="text-2xl font-medium text-foreground">
+            {review.car.make} {review.car.model} ({review.car.year}) Review
+          </h2>
+        </div>
+        
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline">
+              <Download className="mr-1 h-4 w-4" />
+              Export <ChevronDown className="ml-1 h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={handleExportCSV}>
+              <Download className="mr-2 h-4 w-4" />
+              CSV
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleExportGoogleSheets}>
+              <FileSpreadsheet className="mr-2 h-4 w-4" />
+              Google Sheets
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleExportGoogleDocs}>
+              <FileText className="mr-2 h-4 w-4" />
+              Google Docs
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
       
       {/* Review Progress */}
