@@ -465,7 +465,8 @@ export default function ReviewDetail() {
                         </div>
                         <Progress 
                           value={score !== null ? score : 0} 
-                          className="h-1.5" 
+                          max={100}
+                          className={`h-1.5 ${getScoreColorClass(score)}`} 
                         />
                       </div>
                     </div>
@@ -498,11 +499,20 @@ export default function ReviewDetail() {
                     <h3 className="font-medium">{category.name}</h3>
                     {/* Display category score if available */}
                     {calculateCategoryScore(category.id) !== null && (
-                      <div className="flex items-center mt-1">
-                        <span className="text-xs text-muted-foreground mr-1">Score:</span>
-                        <span className={`text-xs font-medium ${getScoreTextColorClass(calculateCategoryScore(category.id))}`}>
-                          {calculateCategoryScore(category.id)?.toFixed(1) || 'N/A'}
-                        </span>
+                      <div className="mt-1">
+                        <div className="flex items-center">
+                          <span className="text-xs text-muted-foreground mr-1">Score:</span>
+                          <span className={`text-xs font-medium ${getScoreTextColorClass(calculateCategoryScore(category.id))}`}>
+                            {calculateCategoryScore(category.id)?.toFixed(1) || 'N/A'}
+                          </span>
+                        </div>
+                        <div className="w-20 h-1.5 mt-0.5">
+                          <Progress 
+                            value={calculateCategoryScore(category.id)} 
+                            max={100}
+                            className={`h-1.5 ${getScoreColorClass(calculateCategoryScore(category.id))}`} 
+                          />
+                        </div>
                       </div>
                     )}
                   </div>
