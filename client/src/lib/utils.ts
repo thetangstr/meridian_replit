@@ -341,12 +341,6 @@ export function generateGoogleDocsExport(
   // Create a title for the document
   const title = `${report.review.car.make} ${report.review.car.model} (${report.review.car.year}) Evaluation Report`;
   
-  // If the property doesn't exist, we create a fallback
-  // Fix for TypeScript error - car property is already in report.review, not in report directly
-  
-  // Google Docs URLs can get too large when passing all our data, so we'll create a simpler version
-  // that focuses on just the summary data, which should work reliably
-  
   // Calculate overall averages for tasks
   let totalTaskScore = 0;
   let taskCount = 0;
@@ -361,34 +355,94 @@ export function generateGoogleDocsExport(
   
   const avgTaskScore = taskCount > 0 ? totalTaskScore / taskCount : 0;
   
-  // Create a simplified document content
-  const docContent = [
-    `# ${title}`,
-    `\nEvaluation Date: ${formatDateTime(report.review.updatedAt || report.review.createdAt)}`,
-    `\nReviewer: ${report.review.reviewer.name}`,
-    
-    '\n## Summary',
-    `\nThis is an evaluation report for ${report.review.car.make} ${report.review.car.model} (${report.review.car.year}).`,
-    `\nOverall Score: ${formatScore(avgTaskScore)}/100`,
-    
-    '\n## Evaluated Features',
-    `\n- Total Tasks Evaluated: ${taskCount}`,
-    `\n- Category Evaluations: ${categoryEvaluations.length}`,
-    
-    '\n## Note',
-    '\nThis is a simplified preview. A complete CSV export has been downloaded to your device.',
-    '\nTo view detailed data:',
-    '\n1. Create a new Google Sheet',
-    '\n2. Go to File > Import > Upload',
-    '\n3. Upload the CSV file that was just downloaded'
-  ].join('\n');
+  // Create a structured document content using markdown formatting
+  // This will display nicely in Google Docs without requiring docx generation
+  const sections = [];
   
-  // Encode the content for URL (using a smaller subset of data to avoid URL size limits)
+  // Title and header
+  sections.push(`# ${title}`);
+  sections.push(`_Evaluation Date: ${formatDateTime(report.review.updatedAt || report.review.createdAt)}_`);
+  sections.push(`_Reviewer: ${report.review.reviewer.name}_`);
+  sections.push('');
+  
+  // Vehicle information
+  sections.push('## Vehicle Information');
+  sections.push('| Property | Value |');
+  sections.push('|----------|-------|');
+  sections.push(`| Make | ${report.review.car.make} |`);
+  sections.push(`| Model | ${report.review.car.model} |`);
+  sections.push(`| Year | ${report.review.car.year} |`);
+  sections.push(`| Android Version | ${report.review.car.androidVersion || 'N/A'} |`);
+  sections.push(`| Build Fingerprint | ${report.review.car.buildFingerprint || 'N/A'} |`);
+  sections.push('');
+  
+  // Summary section
+  sections.push('## Summary');
+  sections.push(`Overall Score: **${formatScore(avgTaskScore)}/100**`);
+  sections.push(`Total Tasks Evaluated: ${taskCount}`);
+  sections.push(`Category Evaluations: ${categoryEvaluations.length}`);
+  sections.push('');
+  
+  // Category scores table
+  sections.push('## Category Scores');
+  sections.push('| Category | Responsiveness | Writing | Emotional | Score |');
+  sections.push('|----------|----------------|---------|-----------|-------|');
+  
+  categoryEvaluations.forEach(catEval => {
+    const categoryName = catEval.category?.name || 'Unknown';
+    const responsivenessScore = catEval.responsivenessScore || 'N/A';
+    const writingScore = catEval.writingScore || 'N/A';
+    const emotionalScore = catEval.emotionalScore || 'N/A';
+    
+    // Calculate category score
+    const categoryScore = calculateCategoryScore(null, catEval);
+    const scoreDisplay = categoryScore !== null ? formatScore(categoryScore) : 'N/A';
+    
+    sections.push(`| ${categoryName} | ${responsivenessScore}/4 | ${writingScore}/4 | ${emotionalScore}/4 | ${scoreDisplay} |`);
+  });
+  
+  sections.push('');
+  
+  // Task evaluations (limited to reduce size)
+  if (taskEvaluations.length > 0) {
+    sections.push('## Task Evaluations');
+    sections.push('_Sample of tasks (limited to 10 tasks)_');
+    sections.push('');
+    sections.push('| Task | Category | Doable | Usability | Visuals | Score |');
+    sections.push('|------|----------|--------|-----------|---------|-------|');
+    
+    // Show up to 10 tasks to avoid making the document too large
+    taskEvaluations.slice(0, 10).forEach(taskEval => {
+      const taskScore = calculateTaskScore(taskEval);
+      const scoreFormatted = taskScore !== null ? formatScore(taskScore) : 'N/A';
+      const categoryName = taskEval.task.cuj?.category?.name || 'Unknown';
+      
+      sections.push(`| ${taskEval.task.name} | ${categoryName} | ${taskEval.doable ? 'Yes' : 'No'} | ${taskEval.usabilityScore}/4 | ${taskEval.visualsScore}/4 | ${scoreFormatted} |`);
+    });
+    
+    if (taskEvaluations.length > 10) {
+      sections.push(`_...and ${taskEvaluations.length - 10} more tasks..._`);
+    }
+    
+    sections.push('');
+  }
+  
+  // Note about CSV export
+  sections.push('## Note');
+  sections.push('This is a simplified preview of the evaluation report. A CSV file has been downloaded to your device.');
+  sections.push('For a complete detailed view with all data, please import the CSV file into a spreadsheet application.');
+  
+  // Join all sections with newlines
+  const docContent = sections.join('\n');
+  
+  // Encode the content for URL
   const encodedContent = encodeURIComponent(docContent);
   
-  // Return the complete URL for Google Docs with our simplified data
+  // Return the Google Docs URL
   return `${baseUrl}?title=${encodeURIComponent(title)}&body=${encodedContent}`;
 }
+
+// No longer need the document helper functions since we're using markdown format
 
 // Export review data to Google Spreadsheet format
 export function exportReviewToGoogleSheets(
@@ -396,13 +450,43 @@ export function exportReviewToGoogleSheets(
   taskEvaluations: TaskEvaluationWithTask[],
   categoryEvaluations: CategoryEvaluationWithCategory[]
 ): string {
-  // Since Google Sheets doesn't support direct content embedding via URL parameters,
-  // we'll generate a CSV file and then provide instructions on how to import it
-  
-  // First, create and download the CSV file
+  // First, create and download the CSV file for the user
   exportReviewToCSV(review, taskEvaluations, categoryEvaluations);
   
-  // Then return the URL to create a new Google Sheet
-  const baseUrl = 'https://docs.google.com/spreadsheets/create';
-  return baseUrl;
+  // Create a more descriptive query string to pass to Google Sheets
+  const title = `${review.car.make} ${review.car.model} (${review.car.year}) Evaluation`;
+  
+  // Create a simplified content to show in a single sheet
+  // This generates just enough data to start, and user can import the CSV for the full dataset
+  
+  // Format data for simple spreadsheet
+  const headers = ["Category", "Task", "Score", "Feedback"];
+  
+  // Group tasks by category for display
+  const categoriesMap: Record<number, { 
+    category: CujCategory, 
+    tasks: TaskEvaluationWithTask[] 
+  }> = {};
+  
+  // Organize task evaluations by category
+  taskEvaluations.forEach(taskEval => {
+    if (taskEval.task.cuj && taskEval.task.cuj.categoryId) {
+      const categoryId = taskEval.task.cuj.categoryId;
+      
+      if (!categoriesMap[categoryId]) {
+        categoriesMap[categoryId] = {
+          category: taskEval.task.cuj.category,
+          tasks: []
+        };
+      }
+      
+      categoriesMap[categoryId].tasks.push(taskEval);
+    }
+  });
+  
+  // Build spreadsheet base URL
+  const sheetsUrl = 'https://docs.google.com/spreadsheets/create';
+  
+  // Return the URL to create a new pre-filled Google Sheet
+  return `${sheetsUrl}?title=${encodeURIComponent(title)}`;
 }
