@@ -538,39 +538,67 @@ export default function ReviewDetail() {
 
                     {/* Category evaluation results summary */}
                     {categoryEvaluations && categoryEvaluations[category.id] && (
-                      <div className="mb-4 p-4 bg-gray-100 rounded-md">
-                        <div className="flex space-x-4 mb-3">
-                          {(() => {
-                            const evalData = categoryEvaluations[category.id];
-                            if (!evalData) return null;
-                            
-                            const respScore = evalData.responsivenessScore;
-                            const writeScore = evalData.writingScore;
-                            const emotionalScore = evalData.emotionalScore;
-                            
-                            return (
-                              <>
-                                <div className="flex items-center space-x-1">
-                                  <span className="text-sm text-muted-foreground">Responsiveness:</span>
-                                  <span className={`text-sm font-medium ${getScoreColorClass(respScore ? (respScore / 4) * 100 : null)}`}>
-                                    {respScore ? `${respScore}/4` : "N/A"}
-                                  </span>
-                                </div>
-                                <div className="flex items-center space-x-1">
-                                  <span className="text-sm text-muted-foreground">Writing:</span>
-                                  <span className={`text-sm font-medium ${getScoreColorClass(writeScore ? (writeScore / 4) * 100 : null)}`}>
-                                    {writeScore ? `${writeScore}/4` : "N/A"}
-                                  </span>
-                                </div>
-                                <div className="flex items-center space-x-1">
-                                  <span className="text-sm text-muted-foreground">Emotional:</span>
-                                  <span className={`text-sm font-medium ${getScoreColorClass(emotionalScore ? (emotionalScore / 4) * 100 : null)}`}>
-                                    {emotionalScore ? `${emotionalScore}/4` : "N/A"}
-                                  </span>
-                                </div>
-                              </>
-                            );
-                          })()}
+                      <div className="mt-2">
+                        <div className="flex items-center space-x-4">
+                          <div className="flex items-center space-x-1">
+                            <span className="text-xs text-muted-foreground">Responsiveness:</span>
+                            {(() => {
+                              const evalData = categoryEvaluations[category.id];
+                              if (!evalData) return <span className="text-xs font-medium">N/A</span>;
+                              
+                              const score = evalData.responsivenessScore;
+                              const scorePercentage = score ? (score / 4) * 100 : null;
+                              return (
+                                <span className={`text-xs font-medium ${getScoreColorClass(scorePercentage)}`}>
+                                  {score ? `${score}/4` : "N/A"}
+                                </span>
+                              );
+                            })()}
+                          </div>
+                          <div className="flex items-center space-x-1">
+                            <span className="text-xs text-muted-foreground">Writing:</span>
+                            {(() => {
+                              const evalData = categoryEvaluations[category.id];
+                              if (!evalData) return <span className="text-xs font-medium">N/A</span>;
+                              
+                              const score = evalData.writingScore;
+                              const scorePercentage = score ? (score / 4) * 100 : null;
+                              return (
+                                <span className={`text-xs font-medium ${getScoreColorClass(scorePercentage)}`}>
+                                  {score ? `${score}/4` : "N/A"}
+                                </span>
+                              );
+                            })()}
+                          </div>
+                          <div className="flex items-center space-x-1">
+                            <span className="text-xs text-muted-foreground">Emotional:</span>
+                            {(() => {
+                              const evalData = categoryEvaluations[category.id];
+                              if (!evalData) return <span className="text-xs font-medium">N/A</span>;
+                              
+                              const score = evalData.emotionalScore;
+                              const scorePercentage = score ? (score / 4) * 100 : null;
+                              return (
+                                <span className={`text-xs font-medium ${getScoreColorClass(scorePercentage)}`}>
+                                  {score ? `${score}/4` : "N/A"}
+                                </span>
+                              );
+                            })()}
+                          </div>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="text-primary ml-auto"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEvaluateCategory(category.id);
+                            }}
+                          >
+                            <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                            View/Edit Evaluation
+                          </Button>
                         </div>
                         
                         {/* Display feedback when available */}
