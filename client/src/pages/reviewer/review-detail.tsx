@@ -453,11 +453,11 @@ export default function ReviewDetail() {
                         <div className="flex justify-between mb-1">
                           <span className="text-sm">{category.name}</span>
                           <span className={`text-sm font-medium ${getScoreTextColorClass(score)}`}>
-                            {score ? score : 'N/A'}
+                            {score !== null ? score.toFixed(1) : 'N/A'}
                           </span>
                         </div>
                         <Progress 
-                          value={score ? score : 0} 
+                          value={score !== null ? score : 0} 
                           className="h-1.5" 
                         />
                       </div>
@@ -531,8 +531,8 @@ export default function ReviewDetail() {
 
                     {/* Category evaluation results summary */}
                     {categoryEvaluations && categoryEvaluations[category.id] && (
-                      <div className="mb-4 p-3 bg-gray-100 rounded-md">
-                        <div className="grid grid-cols-3 gap-4">
+                      <div className="mb-4 p-4 bg-gray-100 rounded-md">
+                        <div className="grid grid-cols-3 gap-4 mb-3">
                           {(() => {
                             const evalData = categoryEvaluations[category.id];
                             if (!evalData) return null;
@@ -543,19 +543,19 @@ export default function ReviewDetail() {
                             
                             return (
                               <>
-                                <div>
+                                <div className="bg-white p-3 rounded-md shadow-sm">
                                   <div className="text-sm font-medium mb-1">Responsiveness</div>
                                   <div className={`text-lg font-bold ${getScoreTextColorClass((respScore / 4) * 100)}`}>
                                     {respScore || 'N/A'}/4
                                   </div>
                                 </div>
-                                <div>
+                                <div className="bg-white p-3 rounded-md shadow-sm">
                                   <div className="text-sm font-medium mb-1">Writing</div>
                                   <div className={`text-lg font-bold ${getScoreTextColorClass((writeScore / 4) * 100)}`}>
                                     {writeScore || 'N/A'}/4
                                   </div>
                                 </div>
-                                <div>
+                                <div className="bg-white p-3 rounded-md shadow-sm">
                                   <div className="text-sm font-medium mb-1">Emotional</div>
                                   <div className={`text-lg font-bold ${getScoreTextColorClass((emotionalScore / 4) * 100)}`}>
                                     {emotionalScore || 'N/A'}/4
@@ -565,6 +565,73 @@ export default function ReviewDetail() {
                             );
                           })()}
                         </div>
+                        
+                        {/* Display feedback when available */}
+                        {(() => {
+                          const evalData = categoryEvaluations[category.id];
+                          if (!evalData) return null;
+                          
+                          const hasFeedback = evalData.responsivenessFeedback || evalData.writingFeedback || evalData.emotionalFeedback;
+                          
+                          if (!hasFeedback) return null;
+                          
+                          return (
+                            <div className="border-t border-gray-200 pt-3 mt-3">
+                              <h5 className="font-medium text-sm mb-2">Feedback Notes</h5>
+                              <div className="space-y-2 text-sm">
+                                {evalData.responsivenessFeedback && (
+                                  <div className="bg-white p-2 rounded-md">
+                                    <span className="font-medium">Responsiveness: </span>
+                                    {evalData.responsivenessFeedback}
+                                  </div>
+                                )}
+                                {evalData.writingFeedback && (
+                                  <div className="bg-white p-2 rounded-md">
+                                    <span className="font-medium">Writing: </span>
+                                    {evalData.writingFeedback}
+                                  </div>
+                                )}
+                                {evalData.emotionalFeedback && (
+                                  <div className="bg-white p-2 rounded-md">
+                                    <span className="font-medium">Emotional Engagement: </span>
+                                    {evalData.emotionalFeedback}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })()}
+                        
+                        {/* Display media evidence when available */}
+                        {(() => {
+                          const evalData = categoryEvaluations[category.id];
+                          if (!evalData || !evalData.media || evalData.media.length === 0) return null;
+                          
+                          return (
+                            <div className="border-t border-gray-200 pt-3 mt-3">
+                              <h5 className="font-medium text-sm mb-2">Evidence</h5>
+                              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                {evalData.media.map((item: any) => (
+                                  <div key={item.id} className="relative aspect-video rounded-md overflow-hidden bg-black/5">
+                                    {item.type === 'image' ? (
+                                      <img 
+                                        src={item.url} 
+                                        alt="Evidence" 
+                                        className="h-full w-full object-cover"
+                                      />
+                                    ) : (
+                                      <video 
+                                        src={item.url} 
+                                        controls 
+                                        className="h-full w-full object-cover"
+                                      />
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </div>
                     )}
 
