@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -20,6 +21,8 @@ interface Issue {
   category: string;
   description: string;
 }
+
+// No helper function needed anymore, we'll use direct conditional rendering
 import { 
   formatDateTime, 
   exportReviewToCSV, 
@@ -64,6 +67,11 @@ export default function ReportView() {
     if (!report) return;
     try {
       exportReviewToCSV(report.review, taskEvaluations, categoryEvaluations);
+      // Refresh the queries to ensure data is up-to-date
+      queryClient.invalidateQueries({ queryKey: [`/api/reports/${reportId}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/reviews/${report?.review.id}/task-evaluations`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/reviews/${report?.review.id}/category-evaluations`] });
+      
       toast({
         title: "Export Complete",
         description: "Your CSV file has been downloaded.",
@@ -84,6 +92,11 @@ export default function ReportView() {
     try {
       const url = generateGoogleDocsExport(report, taskEvaluations, categoryEvaluations);
       window.open(url, '_blank');
+      // Refresh the queries to ensure data is up-to-date
+      queryClient.invalidateQueries({ queryKey: [`/api/reports/${reportId}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/reviews/${report?.review.id}/task-evaluations`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/reviews/${report?.review.id}/category-evaluations`] });
+      
       toast({
         title: "Export Initiated",
         description: "Google Docs should open in a new tab.",
@@ -104,6 +117,11 @@ export default function ReportView() {
     try {
       const url = exportReviewToGoogleSheets(report.review, taskEvaluations, categoryEvaluations);
       window.open(url, '_blank');
+      // Refresh the queries to ensure data is up-to-date
+      queryClient.invalidateQueries({ queryKey: [`/api/reports/${reportId}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/reviews/${report?.review.id}/task-evaluations`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/reviews/${report?.review.id}/category-evaluations`] });
+      
       toast({
         title: "Export Initiated",
         description: "Google Sheets should open in a new tab.",
@@ -417,7 +435,7 @@ export default function ReportView() {
           </div>
         </CardContent>
 
-        {canViewInternalContent && (
+        {canViewInternalContent && renderIfAuthenticated(
           <div className="border-t border-gray-200 p-4 flex justify-center">
             <Button variant="ghost" className="text-primary" onClick={handleViewFullReport}>
               <span>View full detailed report</span>
