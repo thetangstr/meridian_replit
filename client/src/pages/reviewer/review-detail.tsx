@@ -107,10 +107,17 @@ export default function ReviewDetail() {
   useEffect(() => {
     if (categoryEvaluationsData && categoryEvaluationsData.length > 0) {
       const categoryEvalsMap: Record<number, CategoryEvaluation> = {};
+      
+      console.log('Processing category evaluations data:', categoryEvaluationsData);
+      
       categoryEvaluationsData.forEach(catEval => {
         categoryEvalsMap[catEval.categoryId] = catEval;
       });
+      
+      console.log('Resulting category evaluations map:', categoryEvalsMap);
       setCategoryEvaluations(categoryEvalsMap);
+    } else {
+      console.log('No category evaluations data available:', categoryEvaluationsData);
     }
   }, [categoryEvaluationsData]);
   
@@ -605,13 +612,17 @@ export default function ReviewDetail() {
                         {/* Display media evidence when available */}
                         {(() => {
                           const evalData = categoryEvaluations[category.id];
-                          if (!evalData || !evalData.media || evalData.media.length === 0) return null;
+                          if (!evalData) return null;
+                          
+                          // Ensure media is an array with a default of empty array
+                          const mediaArray = Array.isArray(evalData.media) ? evalData.media : [];
+                          if (mediaArray.length === 0) return null;
                           
                           return (
                             <div className="border-t border-gray-200 pt-3 mt-3">
                               <h5 className="font-medium text-sm mb-2">Evidence</h5>
                               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                                {evalData.media.map((item: any) => (
+                                {mediaArray.map((item: any) => (
                                   <div key={item.id} className="relative aspect-video rounded-md overflow-hidden bg-black/5">
                                     {item.type === 'image' ? (
                                       <img 

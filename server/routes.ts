@@ -586,8 +586,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     try {
       const categoryEvaluations = await storage.getCategoryEvaluationsForReview(reviewId);
+      
+      // Log what we're sending back for debugging
+      console.log(`[express] GET /api/reviews/${reviewId}/category-evaluations returning ${categoryEvaluations.length} evaluations:`);
+      console.log(JSON.stringify(categoryEvaluations, null, 2).substring(0, 200) + '...');
+      
       res.json(categoryEvaluations);
     } catch (error) {
+      console.error(`[express] Error getting category evaluations:`, error);
       res.status(500).json({ error: String(error) });
     }
   });
@@ -743,7 +749,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         mimetype: file.mimetype,
         size: file.size,
         type: isVideo ? 'video' as const : 'image' as const,
-        userId: req.user ? req.user.id : 1 // Default to user ID 1 if not authenticated
+        userId: req.user?.id || 1 // Default to user ID 1 if not authenticated
       };
       
       const mediaItem = await storage.saveMedia(mediaData);
@@ -774,7 +780,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete('/api/media/:id', async (req, res) => {
     try {
       const mediaId = req.params.id;
-      const userId = req.user ? req.user.id : 1; // Default to user ID 1 if not authenticated
+      const userId = req.user?.id || 1; // Default to user ID 1 if not authenticated
       
       const success = await storage.deleteMedia(mediaId, userId);
       
