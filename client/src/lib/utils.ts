@@ -12,7 +12,7 @@ import {
   CujCategory,
   Task
 } from "@shared/schema";
-import { saveAs } from 'file-saver';
+import FileSaver from 'file-saver';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -326,7 +326,7 @@ export function exportReviewToCSV(
 
   // Create and download the file
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' });
-  saveAs(blob, `${review.car.make}_${review.car.model}_Review_${new Date().toISOString().split('T')[0]}.csv`);
+  FileSaver.saveAs(blob, `${review.car.make}_${review.car.model}_Review_${new Date().toISOString().split('T')[0]}.csv`);
 }
 
 // Generate Google Docs export URL with data

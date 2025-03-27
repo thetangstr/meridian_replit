@@ -14,6 +14,12 @@ import {
   TaskEvaluationWithTask,
   CategoryEvaluationWithCategory
 } from "@shared/schema";
+
+// Define Issue type for report.topIssues
+interface Issue {
+  category: string;
+  description: string;
+}
 import { 
   formatDateTime, 
   exportReviewToCSV, 
@@ -273,33 +279,33 @@ export default function ReportView() {
               <div className="bg-gray-50 rounded-lg p-4">
                 <p className="mb-2">
                   This IVI is <span className="font-medium text-accent">
-                    {report.overallScore && report.overallScore >= 3.5 ? "outstanding" :
-                     report.overallScore && report.overallScore >= 3.0 ? "good" :
-                     report.overallScore && report.overallScore >= 2.0 ? "ok" : "bad"}
+                    {typeof report.overallScore === 'number' && report.overallScore >= 3.5 ? "outstanding" :
+                     typeof report.overallScore === 'number' && report.overallScore >= 3.0 ? "good" :
+                     typeof report.overallScore === 'number' && report.overallScore >= 2.0 ? "ok" : "bad"}
                   </span>, 
-                  I would rank it <span className="font-medium">#{report.benchmarkRank || "N/A"}</span> in our GAS fleet 
-                  and it is <span className="font-medium">{report.benchmarkComparison || "comparable"}</span> than our previous benchmark.
+                  I would rank it <span className="font-medium">#{report.benchmarkRank ? report.benchmarkRank : "N/A"}</span> in our GAS fleet 
+                  and it is <span className="font-medium">{report.benchmarkComparison ? report.benchmarkComparison : "comparable"}</span> than our previous benchmark.
                 </p>
                 
                 <div className="mt-4">
                   <p className="text-sm font-medium">The thing I liked the most is:</p>
-                  <p className="text-sm text-muted-foreground">{report.topLikes || "No specific highlights mentioned."}</p>
+                  <p className="text-sm text-muted-foreground">{report.topLikes ? report.topLikes : "No specific highlights mentioned."}</p>
                 </div>
                 
                 <div className="mt-3">
                   <p className="text-sm font-medium">The thing I hated the most is:</p>
-                  <p className="text-sm text-muted-foreground">{report.topHates || "No specific issues mentioned."}</p>
+                  <p className="text-sm text-muted-foreground">{report.topHates ? report.topHates : "No specific issues mentioned."}</p>
                 </div>
               </div>
             </div>
           )}
 
           {/* Top Three Issues - Only for internal users */}
-          {canViewInternalContent && report.topIssues && report.topIssues.length > 0 && (
+          {canViewInternalContent && report.topIssues && Array.isArray(report.topIssues) && report.topIssues.length > 0 && (
             <div className="mt-6">
               <h4 className="font-medium mb-2">Top Three Issues</h4>
               <div className="space-y-2">
-                {report.topIssues.slice(0, 3).map((issue, index) => (
+                {report.topIssues.slice(0, 3).map((issue: { category: string; description: string }, index: number) => (
                   <div 
                     key={index} 
                     className={`${
