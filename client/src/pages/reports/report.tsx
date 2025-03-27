@@ -94,7 +94,7 @@ export default function ReportView() {
       
       toast({
         title: "Export Initiated",
-        description: "Google Docs should open in a new tab.",
+        description: "A simplified summary is being created in Google Docs. For full details, download the CSV export.",
       });
     } catch (error) {
       toast({
@@ -118,8 +118,8 @@ export default function ReportView() {
       queryClient.invalidateQueries({ queryKey: [`/api/reviews/${report?.review.id}/category-evaluations`] });
       
       toast({
-        title: "Export Initiated",
-        description: "Google Sheets should open in a new tab.",
+        title: "CSV Export Complete",
+        description: "Your CSV file has been downloaded. Google Sheets will now open in a new tab for importing.",
       });
     } catch (error) {
       toast({
