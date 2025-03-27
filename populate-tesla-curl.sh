@@ -1,15 +1,15 @@
 #!/bin/bash
 
 # Set the API base URL
-API_BASE="http://localhost:3000/api"
+API_BASE="http://localhost:5000/api"
 
 # Login first to get session cookie
-echo "Logging in as reviewer..."
+echo "Logging in as admin..."
 COOKIE_JAR="cookies.txt"
 curl -s -c "$COOKIE_JAR" -X POST "$API_BASE/auth/login" \
   -H "Content-Type: application/json" \
   -d '{
-    "username": "reviewer",
+    "username": "admin",
     "password": "password123"
   }'
 
@@ -43,7 +43,7 @@ CAR_DATA='{
 CAR_RESPONSE=$(api_call "POST" "/cars" "$CAR_DATA")
 
 # Extract car ID from response
-CAR_ID=$(echo $CAR_RESPONSE | sed -n 's/.*"id":\([0-9]*\).*/\1/p')
+CAR_ID=$(echo $CAR_RESPONSE | grep -o '"id":[0-9]*' | head -1 | cut -d':' -f2)
 
 if [ -z "$CAR_ID" ]; then
   echo "Failed to create car or get car ID."
@@ -53,21 +53,30 @@ fi
 
 echo "Created Tesla Model 3 with ID: $CAR_ID"
 
+# Get reviewer ID
+echo "Getting reviewer ID..."
+USERS_RESPONSE=$(api_call "GET" "/users")
+REVIEWER_ID=$(echo $USERS_RESPONSE | grep -o '"id":[0-9]*,"username":"reviewer"' | grep -o 'id":[0-9]*' | cut -d':' -f2)
+
+if [ -z "$REVIEWER_ID" ]; then
+  echo "Failed to get reviewer ID."
+  echo "API Response: $USERS_RESPONSE"
+  exit 1
+fi
+
+echo "Found reviewer with ID: $REVIEWER_ID"
+
 # Create a review for the car
 echo "Creating review for Tesla Model 3..."
-# Get current date and one week later for endDate
-CURRENT_DATE=$(date -u +"%Y-%m-%dT%H:%M:%S.000Z")
-END_DATE=$(date -u -d "+7 days" +"%Y-%m-%dT%H:%M:%S.000Z")
-
 REVIEW_DATA="{
   \"carId\": $CAR_ID,
-  \"reviewerId\": 2,
+  \"reviewerId\": $REVIEWER_ID,
   \"status\": \"in_progress\"
 }"
 REVIEW_RESPONSE=$(api_call "POST" "/reviews" "$REVIEW_DATA")
 
 # Extract review ID from response
-REVIEW_ID=$(echo $REVIEW_RESPONSE | sed -n 's/.*"id":\([0-9]*\).*/\1/p')
+REVIEW_ID=$(echo $REVIEW_RESPONSE | grep -o '"id":[0-9]*' | head -1 | cut -d':' -f2)
 
 if [ -z "$REVIEW_ID" ]; then
   echo "Failed to create review or get review ID."
@@ -77,13 +86,17 @@ fi
 
 echo "Created review with ID: $REVIEW_ID"
 
-# Get tasks for this review
+# Get all tasks for this review
 echo "Getting tasks for review..."
 TASKS_RESPONSE=$(api_call "GET" "/reviews/$REVIEW_ID/tasks")
+echo "Tasks response: $TASKS_RESPONSE"
 
-# Create a few task evaluations
+# Extract first 10 task IDs
+TASK_IDS=$(echo $TASKS_RESPONSE | grep -o '"id":[0-9]*' | cut -d':' -f2 | head -10)
+
+# Create task evaluations
 echo "Creating task evaluations..."
-for TASK_ID in $(echo $TASKS_RESPONSE | grep -o '"id":[0-9]*' | head -10 | cut -d':' -f2); do
+for TASK_ID in $TASK_IDS; do
   # Generate random scores between 3-5
   USABILITY_SCORE=$((RANDOM % 3 + 3))
   VISUALS_SCORE=$((RANDOM % 3 + 3))
@@ -101,9 +114,14 @@ for TASK_ID in $(echo $TASKS_RESPONSE | grep -o '"id":[0-9]*' | head -10 | cut -
   echo "Created evaluation for task $TASK_ID"
 done
 
+# Get all categories
+echo "Getting categories..."
+CATEGORIES_RESPONSE=$(api_call "GET" "/categories")
+CATEGORY_IDS=$(echo $CATEGORIES_RESPONSE | grep -o '"id":[0-9]*' | cut -d':' -f2)
+
 # Create category evaluations
 echo "Creating category evaluations..."
-for CATEGORY_ID in 1 2 3 4; do
+for CATEGORY_ID in $CATEGORY_IDS; do
   # Generate random scores between 3-4
   RESP_SCORE=$((RANDOM % 2 + 3))
   WRITING_SCORE=$((RANDOM % 2 + 3))

@@ -1,5 +1,6 @@
 // Script to add a Tesla Model 3 to the database
-const { storage } = require('./server/storage');
+const path = require('path');
+const { storage } = require(path.join('.', 'server', 'storage'));
 
 async function addTeslaModel3() {
   try {

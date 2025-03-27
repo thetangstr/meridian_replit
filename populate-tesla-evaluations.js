@@ -1,6 +1,10 @@
 // Script to add a Tesla Model 3 with evaluations
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
+import dotenv from 'dotenv';
+
+// Load environment variables
+dotenv.config();
 
 // Initialize database connection
 const pool = new Pool({
