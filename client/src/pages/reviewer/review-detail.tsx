@@ -539,34 +539,34 @@ export default function ReviewDetail() {
                     {/* Category evaluation results summary */}
                     {categoryEvaluations && categoryEvaluations[category.id] && (
                       <div className="mb-4 p-4 bg-gray-100 rounded-md">
-                        <div className="grid grid-cols-3 gap-4 mb-3">
+                        <div className="flex space-x-4 mb-3">
                           {(() => {
                             const evalData = categoryEvaluations[category.id];
                             if (!evalData) return null;
                             
-                            const respScore = evalData.responsivenessScore || 0;
-                            const writeScore = evalData.writingScore || 0;
-                            const emotionalScore = evalData.emotionalScore || 0;
+                            const respScore = evalData.responsivenessScore;
+                            const writeScore = evalData.writingScore;
+                            const emotionalScore = evalData.emotionalScore;
                             
                             return (
                               <>
-                                <div className="bg-white p-3 rounded-md shadow-sm">
-                                  <div className="text-sm font-medium mb-1">Responsiveness</div>
-                                  <div className={`text-lg font-bold ${getScoreTextColorClass((respScore / 4) * 100)}`}>
-                                    {respScore || 'N/A'}/4
-                                  </div>
+                                <div className="flex items-center space-x-1">
+                                  <span className="text-sm text-muted-foreground">Responsiveness:</span>
+                                  <span className={`text-sm font-medium ${getScoreColorClass(respScore ? (respScore / 4) * 100 : null)}`}>
+                                    {respScore ? `${respScore}/4` : "N/A"}
+                                  </span>
                                 </div>
-                                <div className="bg-white p-3 rounded-md shadow-sm">
-                                  <div className="text-sm font-medium mb-1">Writing</div>
-                                  <div className={`text-lg font-bold ${getScoreTextColorClass((writeScore / 4) * 100)}`}>
-                                    {writeScore || 'N/A'}/4
-                                  </div>
+                                <div className="flex items-center space-x-1">
+                                  <span className="text-sm text-muted-foreground">Writing:</span>
+                                  <span className={`text-sm font-medium ${getScoreColorClass(writeScore ? (writeScore / 4) * 100 : null)}`}>
+                                    {writeScore ? `${writeScore}/4` : "N/A"}
+                                  </span>
                                 </div>
-                                <div className="bg-white p-3 rounded-md shadow-sm">
-                                  <div className="text-sm font-medium mb-1">Emotional</div>
-                                  <div className={`text-lg font-bold ${getScoreTextColorClass((emotionalScore / 4) * 100)}`}>
-                                    {emotionalScore || 'N/A'}/4
-                                  </div>
+                                <div className="flex items-center space-x-1">
+                                  <span className="text-sm text-muted-foreground">Emotional:</span>
+                                  <span className={`text-sm font-medium ${getScoreColorClass(emotionalScore ? (emotionalScore / 4) * 100 : null)}`}>
+                                    {emotionalScore ? `${emotionalScore}/4` : "N/A"}
+                                  </span>
                                 </div>
                               </>
                             );
@@ -646,8 +646,15 @@ export default function ReviewDetail() {
                       </div>
                     )}
 
-                    <div className="flex items-center">
-                      <h4 className="font-semibold text-sm">Tasks ({completedCount}/{categoryTasks.length})</h4>
+                    <div className="mt-3 flex justify-between items-center">
+                      <div className="flex space-x-4">
+                        <div className="flex items-center space-x-1">
+                          <span className="text-sm font-medium">Tasks:</span>
+                          <span className="text-sm">
+                            {completedCount}/{categoryTasks.length} completed
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                   
