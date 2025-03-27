@@ -81,7 +81,11 @@ export default function CategoryEvaluationPage() {
       );
     },
     onSuccess: () => {
+      // Invalidate single category evaluation
       queryClient.invalidateQueries({ queryKey: [`/api/reviews/${reviewId}/categories/${categoryId}/evaluation`] });
+      // Invalidate all category evaluations for this review
+      queryClient.invalidateQueries({ queryKey: [`/api/reviews/${reviewId}/category-evaluations`] });
+      // Invalidate review data
       queryClient.invalidateQueries({ queryKey: [`/api/reviews/${reviewId}`] });
       
       toast({
@@ -113,7 +117,10 @@ export default function CategoryEvaluationPage() {
       );
     },
     onSuccess: () => {
+      // Invalidate single category evaluation
       queryClient.invalidateQueries({ queryKey: [`/api/reviews/${reviewId}/categories/${categoryId}/evaluation`] });
+      // Invalidate all category evaluations for this review
+      queryClient.invalidateQueries({ queryKey: [`/api/reviews/${reviewId}/category-evaluations`] });
       
       toast({
         title: "Draft Saved",

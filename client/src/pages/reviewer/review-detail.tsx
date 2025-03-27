@@ -105,9 +105,10 @@ export default function ReviewDetail() {
   
   // Process category evaluations when data is loaded
   useEffect(() => {
+    // Initialize with empty object instead of setting to null when no data
+    const categoryEvalsMap: Record<number, CategoryEvaluation> = {};
+    
     if (categoryEvaluationsData && categoryEvaluationsData.length > 0) {
-      const categoryEvalsMap: Record<number, CategoryEvaluation> = {};
-      
       console.log('Processing category evaluations data:', categoryEvaluationsData);
       
       categoryEvaluationsData.forEach(catEval => {
@@ -115,10 +116,12 @@ export default function ReviewDetail() {
       });
       
       console.log('Resulting category evaluations map:', categoryEvalsMap);
-      setCategoryEvaluations(categoryEvalsMap);
     } else {
       console.log('No category evaluations data available:', categoryEvaluationsData);
     }
+    
+    // Always update state, even with empty map
+    setCategoryEvaluations(categoryEvalsMap);
   }, [categoryEvaluationsData]);
   
   // Loading states
