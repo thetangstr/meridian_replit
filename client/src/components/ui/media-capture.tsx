@@ -19,6 +19,9 @@ export function MediaCapture({
   onChange,
   className
 }: MediaCaptureProps) {
+  // Constants
+  const MAX_RECORDING_TIME = 120; // 2 minutes in seconds
+  
   const { toast } = useToast();
   const cameraRef = useRef<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -315,7 +318,18 @@ export function MediaCapture({
         
         // Start the timer
         recordingTimerRef.current = setInterval(() => {
-          setRecordingTime(prevTime => prevTime + 1);
+          setRecordingTime(prevTime => {
+            const newTime = prevTime + 1;
+            // Auto-stop recording at MAX_RECORDING_TIME (2 minutes)
+            if (newTime >= MAX_RECORDING_TIME) {
+              stopRecording();
+              toast({
+                title: "Recording complete",
+                description: `Recording automatically stopped at ${MAX_RECORDING_TIME / 60} minutes.`
+              });
+            }
+            return newTime;
+          });
         }, 1000);
         
         // Clear any previous recorded chunks
@@ -416,6 +430,39 @@ export function MediaCapture({
       }
       
       const file = files[i];
+      
+      // Check video duration for videos
+      if (type === 'video') {
+        try {
+          // Create a temporary URL to check the video duration
+          const url = URL.createObjectURL(file);
+          const video = document.createElement('video');
+          
+          // Wait for video metadata to load
+          await new Promise((resolve, reject) => {
+            video.onloadedmetadata = resolve;
+            video.onerror = reject;
+            video.src = url;
+          });
+          
+          // Check if video is too long (duration is in seconds)
+          if (video.duration > MAX_RECORDING_TIME) {
+            URL.revokeObjectURL(url);
+            toast({
+              variant: "destructive",
+              title: "Video too long",
+              description: `Videos must be ${MAX_RECORDING_TIME / 60} minutes or less. This video is ${Math.ceil(video.duration / 60)} minutes.`
+            });
+            continue; // Skip this file
+          }
+          
+          URL.revokeObjectURL(url);
+        } catch (error) {
+          console.error("Error checking video duration:", error);
+          // Continue with upload if we can't check the duration
+        }
+      }
+      
       await handleFileUpload(file, type);
     }
     
@@ -611,10 +658,18 @@ export function MediaCapture({
                 muted
               />
               
+              {!isRecording && (
+                <div className="absolute top-14 left-4 right-4 bg-black/60 text-white text-xs rounded-md px-3 py-1.5">
+                  <div className="text-center">
+                    <span className="font-medium">Maximum recording time: {Math.floor(MAX_RECORDING_TIME / 60)} minutes</span>
+                  </div>
+                </div>
+              )}
+              
               {isRecording && (
                 <div className="absolute top-14 right-4 bg-destructive text-white text-xs rounded-full px-2 py-1 flex items-center animate-pulse">
                   <span className="mr-1 h-2 w-2 rounded-full bg-white inline-block"></span>
-                  {formatTime(recordingTime)}
+                  {formatTime(recordingTime)} / {formatTime(MAX_RECORDING_TIME)}
                 </div>
               )}
             </div>
@@ -698,6 +753,11 @@ export function MediaCapture({
               if (uploadType === 'image') {
                 fileInputRef.current?.click();
               } else {
+                // Show the time limit notification when using video
+                toast({
+                  title: "Video length limit",
+                  description: `Videos must be ${MAX_RECORDING_TIME / 60} minutes or less.`
+                });
                 videoInputRef.current?.click();
               }
             }}
@@ -711,7 +771,33 @@ export function MediaCapture({
             </span>
           </Button>
           
-          {/* Photo/Video toggle removed from main page */}
+          {/* Photo/Video toggle for upload mode */}
+          <div className="mt-4 flex justify-center">
+            <div className="bg-muted inline-flex rounded-lg p-1">
+              <button
+                type="button"
+                className={`px-3 py-1 rounded-md text-sm flex items-center ${uploadType === 'image' ? 'bg-white shadow' : 'text-muted-foreground'}`}
+                onClick={() => setUploadType('image')}
+              >
+                <CameraIcon className="h-4 w-4 mr-2" />
+                Photo
+              </button>
+              <button
+                type="button"
+                className={`px-3 py-1 rounded-md text-sm flex items-center ${uploadType === 'video' ? 'bg-white shadow' : 'text-muted-foreground'}`}
+                onClick={() => {
+                  setUploadType('video');
+                  toast({
+                    title: "Video length limit",
+                    description: `Videos must be ${MAX_RECORDING_TIME / 60} minutes or less.`
+                  });
+                }}
+              >
+                <Video className="h-4 w-4 mr-2" />
+                Video
+              </button>
+            </div>
+          </div>
         </div>
       )}
       

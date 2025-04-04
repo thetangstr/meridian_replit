@@ -3,7 +3,7 @@ import { useLocation, useParams } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ChevronDown, ChevronRight, Navigation, Headphones, Phone, Settings, Check, X, Download, FileSpreadsheet, FileText } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronRight, Navigation, Headphones, Phone, Settings, Check, X, Download, FileSpreadsheet, FileText, Camera as CameraIcon } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { CujCategory, Task, Review, ReviewWithDetails, TaskEvaluation, CategoryEvaluation, Cuj } from "@shared/schema";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -596,6 +596,47 @@ export default function ReviewDetail() {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+      
+      {/* Car Details Card */}
+      <Card className="mb-6">
+        <CardContent className="p-4">
+          <div className="flex items-start gap-4 md:gap-6">
+            {/* Car Image */}
+            <div className="w-24 h-24 md:w-32 md:h-32 flex-shrink-0 bg-muted rounded-md overflow-hidden">
+              {review.car.imageUrl ? (
+                <img 
+                  src={review.car.imageUrl} 
+                  alt={`${review.car.make} ${review.car.model}`}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-muted text-muted-foreground">
+                  <CameraIcon className="h-8 w-8 opacity-50" />
+                </div>
+              )}
+            </div>
+            
+            {/* Car Info */}
+            <div className="flex-1">
+              <h3 className="text-lg font-medium mb-1">{review.car.make} {review.car.model} ({review.car.year})</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                <div>
+                  <span className="text-muted-foreground">Android Version:</span>{" "}
+                  <span className="font-medium">{review.car.androidVersion}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Location:</span>{" "}
+                  <span className="font-medium">{review.car.location}</span>
+                </div>
+                <div className="md:col-span-2">
+                  <span className="text-muted-foreground">Build:</span>{" "}
+                  <span className="font-mono text-xs">{review.car.buildFingerprint}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
       
       {/* Review Progress */}
       <Card className="mb-6">
