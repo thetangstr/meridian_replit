@@ -37,7 +37,10 @@ import {
   ReportWithReview,
   CategoryEvaluationWithCategory,
   TaskEvaluationWithTask,
-  MediaItem
+  MediaItem,
+  cujDatabaseVersions,
+  CujDatabaseVersion,
+  InsertCujDatabaseVersion
 } from "@shared/schema";
 import { calculateTaskScore, calculateCategoryScore } from "../client/src/lib/utils";
 
@@ -113,9 +116,16 @@ export interface IStorage {
   getMediaItem(id: string): Promise<MediaItem | undefined>;
   deleteMedia(id: string, userId: number): Promise<boolean>;
   
+  // CUJ Database Version operations
+  getCujDatabaseVersion(id: number): Promise<CujDatabaseVersion | undefined>;
+  getActiveCujDatabaseVersion(): Promise<CujDatabaseVersion | undefined>;
+  getAllCujDatabaseVersions(): Promise<CujDatabaseVersion[]>;
+  createCujDatabaseVersion(version: InsertCujDatabaseVersion): Promise<CujDatabaseVersion>;
+  setActiveCujDatabaseVersion(id: number): Promise<CujDatabaseVersion>;
+  
   // CUJ Data Sync
   getCujSyncStatus(): Promise<{ lastSync: string, status: string }>;
-  syncCujData(): Promise<{ success: boolean, message: string }>;
+  syncCujData(spreadsheetData?: any): Promise<{ success: boolean, message: string, versionId?: number }>;
 }
 
 export class MemStorage implements IStorage {
@@ -130,6 +140,7 @@ export class MemStorage implements IStorage {
   private scoringConfig: ScoringConfig;
   private reports: Map<number, Report>;
   private cujSyncData: { lastSync: string, status: string };
+  private cujDatabaseVersions: Map<number, CujDatabaseVersion>;
   
   private userIdCounter: number = 1;
   private categoryIdCounter: number = 1;
@@ -140,6 +151,7 @@ export class MemStorage implements IStorage {
   private taskEvalIdCounter: number = 1;
   private categoryEvalIdCounter: number = 1;
   private reportIdCounter: number = 1;
+  private cujDatabaseVersionIdCounter: number = 1;
 
   constructor() {
     this.users = new Map();
@@ -151,6 +163,7 @@ export class MemStorage implements IStorage {
     this.taskEvaluations = new Map();
     this.categoryEvaluations = new Map();
     this.reports = new Map();
+    this.cujDatabaseVersions = new Map();
     
     // Initialize with default scoring config
     this.scoringConfig = {
@@ -176,6 +189,15 @@ export class MemStorage implements IStorage {
   }
   
   private async initializeSampleData() {
+    // Create initial CUJ database version
+    await this.createCujDatabaseVersion({
+      versionNumber: "v1.0",
+      sourceType: "system",
+      sourceFileName: null,
+      isActive: true,
+      createdBy: 1 // Admin user (will be created next)
+    });
+    
     // Create sample users
     await this.createUser({ username: "admin", password: "admin123", name: "Admin User", role: "admin" });
     await this.createUser({ username: "reviewer", password: "review123", name: "Test Reviewer", role: "reviewer" });
@@ -772,11 +794,16 @@ export class MemStorage implements IStorage {
     const id = this.reviewIdCounter++;
     const now = new Date().toISOString();
     
+    // Get the active CUJ database version to associate with this review
+    const activeVersion = await this.getActiveCujDatabaseVersion();
+    
     const newReview: Review = {
       ...review,
       id,
       createdAt: now,
-      updatedAt: now
+      updatedAt: now,
+      // Set the cujDatabaseVersionId if an active version exists
+      cujDatabaseVersionId: activeVersion?.id || null
     };
     
     this.reviews.set(id, newReview);
@@ -1128,13 +1155,96 @@ export class MemStorage implements IStorage {
   }
   
   // CUJ Data Sync methods
+  // CUJ Database Version operations
+  async getCujDatabaseVersion(id: number): Promise<CujDatabaseVersion | undefined> {
+    return this.cujDatabaseVersions.get(id);
+  }
+  
+  async getActiveCujDatabaseVersion(): Promise<CujDatabaseVersion | undefined> {
+    // Find the active version
+    for (const version of this.cujDatabaseVersions.values()) {
+      if (version.isActive) {
+        return version;
+      }
+    }
+    return undefined;
+  }
+  
+  async getAllCujDatabaseVersions(): Promise<CujDatabaseVersion[]> {
+    return Array.from(this.cujDatabaseVersions.values());
+  }
+  
+  async createCujDatabaseVersion(version: InsertCujDatabaseVersion): Promise<CujDatabaseVersion> {
+    const id = this.cujDatabaseVersionIdCounter++;
+    
+    // If this is the first version or explicitly set to active, make it active
+    // and deactivate all others
+    if (version.isActive || this.cujDatabaseVersions.size === 0) {
+      // Deactivate all existing versions
+      for (const existingVersion of this.cujDatabaseVersions.values()) {
+        this.cujDatabaseVersions.set(existingVersion.id, {
+          ...existingVersion,
+          isActive: false
+        });
+      }
+    }
+    
+    const newVersion: CujDatabaseVersion = {
+      id,
+      versionNumber: version.versionNumber,
+      sourceType: version.sourceType,
+      sourceFileName: version.sourceFileName,
+      createdAt: new Date(),
+      createdBy: version.createdBy,
+      isActive: version.isActive ?? true
+    };
+    
+    this.cujDatabaseVersions.set(id, newVersion);
+    return newVersion;
+  }
+  
+  async setActiveCujDatabaseVersion(id: number): Promise<CujDatabaseVersion> {
+    const version = this.cujDatabaseVersions.get(id);
+    if (!version) {
+      throw new Error(`CUJ database version with ID ${id} not found`);
+    }
+    
+    // Deactivate all versions
+    for (const existingVersion of this.cujDatabaseVersions.values()) {
+      this.cujDatabaseVersions.set(existingVersion.id, {
+        ...existingVersion,
+        isActive: false
+      });
+    }
+    
+    // Activate the specified version
+    const updatedVersion: CujDatabaseVersion = {
+      ...version,
+      isActive: true
+    };
+    
+    this.cujDatabaseVersions.set(id, updatedVersion);
+    return updatedVersion;
+  }
+  
   async getCujSyncStatus(): Promise<{ lastSync: string, status: string }> {
     return this.cujSyncData;
   }
   
-  async syncCujData(): Promise<{ success: boolean, message: string }> {
-    // Simulate syncing CUJ data
-    // In a real app, this would fetch from an external source
+  async syncCujData(spreadsheetData?: any): Promise<{ success: boolean, message: string, versionId?: number }> {
+    // In a real implementation, this would parse the spreadsheet data
+    // and create a new CUJ database version with the imported data
+    
+    // For now, we'll create a new version to simulate the import
+    const versionName = `v${this.cujDatabaseVersionIdCounter}`;
+    const newVersion = await this.createCujDatabaseVersion({
+      versionNumber: versionName,
+      sourceType: "spreadsheet",
+      sourceFileName: "sample-cuj-data.xlsx",
+      isActive: true,
+      createdBy: 1 // Admin user ID
+    });
+    
     this.cujSyncData = {
       lastSync: new Date().toISOString(),
       status: "up_to_date"
@@ -1142,7 +1252,8 @@ export class MemStorage implements IStorage {
     
     return {
       success: true,
-      message: "CUJ data successfully synchronized"
+      message: `CUJ database synchronized successfully. Created version: ${versionName}`,
+      versionId: newVersion.id
     };
   }
   

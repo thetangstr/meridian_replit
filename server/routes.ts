@@ -686,6 +686,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // CUJ Database Version routes
+  app.get('/api/cuj-database-versions', isAuthenticated, async (req, res) => {
+    try {
+      const versions = await storage.getAllCujDatabaseVersions();
+      res.json(versions);
+    } catch (error) {
+      res.status(500).json({ error: String(error) });
+    }
+  });
+  
+  app.get('/api/cuj-database-versions/active', isAuthenticated, async (req, res) => {
+    try {
+      const activeVersion = await storage.getActiveCujDatabaseVersion();
+      if (!activeVersion) {
+        return res.status(404).json({ error: "No active CUJ database version found" });
+      }
+      res.json(activeVersion);
+    } catch (error) {
+      res.status(500).json({ error: String(error) });
+    }
+  });
+  
+  app.post('/api/cuj-database-versions', isAuthenticated, hasRole(['admin']), async (req, res) => {
+    try {
+      const versionData = req.body;
+      
+      // Add the current user's ID as the creator
+      versionData.createdBy = (req as AuthenticatedRequest).user.id;
+      
+      const newVersion = await storage.createCujDatabaseVersion(versionData);
+      res.status(201).json(newVersion);
+    } catch (error) {
+      res.status(500).json({ error: String(error) });
+    }
+  });
+  
+  app.post('/api/cuj-database-versions/:id/set-active', isAuthenticated, hasRole(['admin']), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid ID format" });
+      }
+      
+      const updatedVersion = await storage.setActiveCujDatabaseVersion(id);
+      res.json(updatedVersion);
+    } catch (error) {
+      res.status(500).json({ error: String(error) });
+    }
+  });
+  
   app.post('/api/admin/sync-cuj-data', isAuthenticated, hasRole(['admin']), async (req, res) => {
     try {
       const result = await storage.syncCujData();

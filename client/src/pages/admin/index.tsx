@@ -11,7 +11,8 @@ import {
   CujCategory,
   Cuj,
   Task,
-  TaskWithCategory
+  TaskWithCategory,
+  CujDatabaseVersion
 } from "@shared/schema";
 import { 
   Loader2, 
@@ -21,7 +22,10 @@ import {
   FolderTree,
   ChevronDown,
   ChevronUp,
-  Search
+  Search,
+  CheckCircle2,
+  Database,
+  Upload
 } from "lucide-react";
 import { formatDateTime } from "@/lib/utils";
 import { 
@@ -54,6 +58,16 @@ export default function AdminDashboard() {
   // Fetch CUJ data sync status
   const { data: cujSyncStatus, isLoading: isLoadingCujStatus } = useQuery<{ lastSync: string; status: string }>({
     queryKey: ['/api/admin/cuj-sync-status'],
+  });
+  
+  // Fetch CUJ database versions
+  const { data: cujDatabaseVersions, isLoading: isLoadingVersions } = useQuery<CujDatabaseVersion[]>({
+    queryKey: ['/api/cuj-database-versions'],
+  });
+  
+  // Fetch active CUJ database version
+  const { data: activeCujDatabaseVersion, isLoading: isLoadingActiveVersion } = useQuery<CujDatabaseVersion>({
+    queryKey: ['/api/cuj-database-versions/active'],
   });
   
   // Fetch CUJ categories
@@ -162,16 +176,44 @@ export default function AdminDashboard() {
         body: JSON.stringify({})
       });
     },
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/cuj-sync-status'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/cuj-database-versions'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/cuj-database-versions/active'] });
+      
       toast({
         title: "CUJ Data Synced",
-        description: "Critical User Journey data has been successfully updated.",
+        description: `Critical User Journey data has been successfully updated. Version ${data?.versionId ? `#${data.versionId}` : ''} created.`,
       });
     },
     onError: (error) => {
       toast({
         title: "Error Syncing CUJ Data",
+        description: error instanceof Error ? error.message : "An unexpected error occurred",
+        variant: "destructive",
+      });
+    },
+  });
+  
+  // Set active CUJ database version mutation
+  const setActiveCujDatabaseVersion = useMutation({
+    mutationFn: async (versionId: number) => {
+      return await apiRequest(`/api/cuj-database-versions/${versionId}/activate`, {
+        method: 'POST',
+        body: JSON.stringify({})
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/cuj-database-versions'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/cuj-database-versions/active'] });
+      toast({
+        title: "Version Activated",
+        description: "This CUJ database version is now active for new reviews.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error Activating Version",
         description: error instanceof Error ? error.message : "An unexpected error occurred",
         variant: "destructive",
       });
@@ -211,6 +253,11 @@ export default function AdminDashboard() {
     syncCujData.mutate();
   };
   
+  // Handle set active CUJ database version
+  const handleSetActiveCujDatabaseVersion = (versionId: number) => {
+    setActiveCujDatabaseVersion.mutate(versionId);
+  };
+  
   // Filter tasks by category
   const getTasksByCategory = (categoryId: number) => {
     if (!tasks) return [];
@@ -227,7 +274,7 @@ export default function AdminDashboard() {
   };
   
   // Show loading state
-  if (isLoadingConfig || isLoadingCujStatus || isLoadingCategories || isLoadingCujs || isLoadingTasks) {
+  if (isLoadingConfig || isLoadingCujStatus || isLoadingCategories || isLoadingCujs || isLoadingTasks || isLoadingVersions || isLoadingActiveVersion) {
     return (
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-20 sm:pb-6">
         <div className="mb-6">
@@ -470,7 +517,7 @@ export default function AdminDashboard() {
                   <p className="text-muted-foreground">Update the master CUJ data from external source.</p>
                 </div>
 
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between mb-6">
                   <div>
                     {cujSyncStatus && (
                       <>
@@ -502,6 +549,85 @@ export default function AdminDashboard() {
                       </>
                     )}
                   </Button>
+                </div>
+                
+                {/* CUJ Database Versions */}
+                <div>
+                  <h4 className="text-base font-medium mb-3 flex items-center">
+                    <Database className="h-4 w-4 mr-1" />
+                    CUJ Database Versions
+                  </h4>
+                  
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-16">ID</TableHead>
+                          <TableHead>Version</TableHead>
+                          <TableHead>Source</TableHead>
+                          <TableHead>Created</TableHead>
+                          <TableHead className="w-32 text-center">Status</TableHead>
+                          <TableHead className="w-32 text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {cujDatabaseVersions && cujDatabaseVersions.length > 0 ? (
+                          cujDatabaseVersions.map((version) => {
+                            const isActive = activeCujDatabaseVersion?.id === version.id;
+                            return (
+                              <TableRow key={version.id} className={isActive ? "bg-primary/5" : ""}>
+                                <TableCell className="font-mono">{version.id}</TableCell>
+                                <TableCell className="font-medium">{version.versionNumber}</TableCell>
+                                <TableCell>{version.sourceType}{version.sourceFileName ? `: ${version.sourceFileName}` : ''}</TableCell>
+                                <TableCell>{formatDateTime(version.createdAt)}</TableCell>
+                                <TableCell className="text-center">
+                                  {isActive ? (
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-accent text-accent-foreground">
+                                      <CheckCircle2 className="h-3 w-3 mr-1" />
+                                      Active
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">
+                                      Inactive
+                                    </span>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  {!isActive && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => handleSetActiveCujDatabaseVersion(version.id)}
+                                      disabled={setActiveCujDatabaseVersion.isPending}
+                                      className="text-xs"
+                                    >
+                                      {setActiveCujDatabaseVersion.isPending ? (
+                                        <>
+                                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                          Setting...
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Upload className="h-3 w-3 mr-1" />
+                                          Set Active
+                                        </>
+                                      )}
+                                    </Button>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })
+                        ) : (
+                          <TableRow>
+                            <TableCell colSpan={6} className="text-center py-4 text-muted-foreground">
+                              No database versions found. Click "Sync Now" to create a new version.
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </div>
               </CardContent>
             </Card>

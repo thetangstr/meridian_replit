@@ -11,6 +11,25 @@ export const users = pgTable("users", {
   role: text("role").notNull().default("reviewer"), // reviewer, internal, external, admin
 });
 
+// CUJ Database Version
+export const cujDatabaseVersions = pgTable("cuj_database_versions", {
+  id: serial("id").primaryKey(),
+  versionNumber: text("version_number").notNull().unique(),
+  sourceType: text("source_type").notNull(), // 'spreadsheet', 'manual', etc.
+  sourceFileName: text("source_file_name"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  createdBy: integer("created_by").references(() => users.id),
+  isActive: boolean("is_active").default(true).notNull(),
+});
+
+export const insertCujDatabaseVersionSchema = createInsertSchema(cujDatabaseVersions).pick({
+  versionNumber: true,
+  sourceType: true,
+  sourceFileName: true,
+  createdBy: true,
+  isActive: true,
+});
+
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
@@ -94,6 +113,7 @@ export const reviews = pgTable("reviews", {
   endDate: timestamp("end_date").notNull(),
   isPublished: boolean("is_published").default(false).notNull(), // Whether the review is locked and published
   lastModifiedById: integer("last_modified_by_id").references(() => users.id),
+  cujDatabaseVersionId: integer("cuj_database_version_id").references(() => cujDatabaseVersions.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -104,6 +124,7 @@ export const insertReviewSchema = createInsertSchema(reviews).pick({
   status: true,
   startDate: true,
   endDate: true,
+  cujDatabaseVersionId: true,
 });
 
 export const updateReviewSchema = createInsertSchema(reviews).pick({
@@ -223,6 +244,9 @@ export const insertReportSchema = createInsertSchema(reports).pick({
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 
+export type CujDatabaseVersion = typeof cujDatabaseVersions.$inferSelect;
+export type InsertCujDatabaseVersion = z.infer<typeof insertCujDatabaseVersionSchema>;
+
 export type CujCategory = typeof cujCategories.$inferSelect;
 export type InsertCujCategory = z.infer<typeof insertCujCategorySchema>;
 
@@ -261,6 +285,7 @@ export type ReviewWithDetails = Review & {
   car: Car;
   reviewer: User;
   lastModifiedBy?: User;
+  cujDatabaseVersion?: CujDatabaseVersion;
 };
 
 export type TaskEvaluationWithTask = TaskEvaluation & {
