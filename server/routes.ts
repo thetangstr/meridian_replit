@@ -790,19 +790,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'No file uploaded' });
       }
       
-      const file = req.file;
-      const isVideo = file.mimetype.startsWith('video/');
+      // Import and use the Firebase Media Storage
+      const { FirebaseMediaStorage } = await import('./firebaseStorage');
+      const firebaseStorage = new FirebaseMediaStorage();
       
-      const mediaData = {
-        filename: file.filename,
-        originalName: file.originalname,
-        mimetype: file.mimetype,
-        size: file.size,
-        type: isVideo ? 'video' as const : 'image' as const,
-        userId: req.user?.id || 1 // Default to user ID 1 if not authenticated
-      };
+      // Save media with Firebase storage
+      const mediaItem = await firebaseStorage.saveMedia(req.file);
       
-      const mediaItem = await storage.saveMedia(mediaData);
       res.status(201).json(mediaItem);
     } catch (error) {
       console.error('Media upload error:', error);
@@ -814,14 +808,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/media/:id', async (req, res) => {
     try {
       const mediaId = req.params.id;
-      const mediaItem = await storage.getMediaItem(mediaId);
       
-      if (!mediaItem) {
-        return res.status(404).json({ error: 'Media item not found' });
+      // First try to get from Firebase storage (if ID is provided)
+      try {
+        const mediaItem = await storage.getMediaItem(mediaId);
+        if (mediaItem) {
+          return res.json(mediaItem);
+        }
+      } catch (innerError) {
+        console.error('Error fetching from standard storage:', innerError);
       }
       
-      res.json(mediaItem);
+      // Return 404 if not found
+      return res.status(404).json({ error: 'Media item not found' });
     } catch (error) {
+      res.status(500).json({ error: String(error) });
+    }
+  });
+  
+  // Static file serving for local files
+  app.get('/api/media/file/:filename', async (req, res) => {
+    try {
+      const { FirebaseMediaStorage } = await import('./firebaseStorage');
+      const firebaseStorage = new FirebaseMediaStorage();
+      
+      const filename = req.params.filename;
+      const filePath = firebaseStorage.getLocalFilePath(filename);
+      
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ error: 'File not found' });
+      }
+      
+      res.sendFile(filePath);
+    } catch (error) {
+      console.error('Error serving file:', error);
       res.status(500).json({ error: String(error) });
     }
   });
@@ -830,12 +850,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete('/api/media/:id', async (req, res) => {
     try {
       const mediaId = req.params.id;
-      const userId = req.user?.id || 1; // Default to user ID 1 if not authenticated
       
-      const success = await storage.deleteMedia(mediaId, userId);
+      // First get the media item to know its URL
+      const mediaItem = await storage.getMediaItem(mediaId);
+      if (!mediaItem) {
+        return res.status(404).json({ error: 'Media item not found' });
+      }
       
-      if (!success) {
-        return res.status(404).json({ error: 'Media item not found or unauthorized' });
+      // Delete from Firebase storage if applicable
+      if (mediaItem.url) {
+        const { FirebaseMediaStorage } = await import('./firebaseStorage');
+        const firebaseStorage = new FirebaseMediaStorage();
+        
+        await firebaseStorage.deleteMedia(mediaId, mediaItem.url);
+      }
+      
+      // Also try to delete from regular storage
+      try {
+        const userId = req.user?.id || 1; // Default to user ID 1 if not authenticated
+        await storage.deleteMedia(mediaId, userId);
+      } catch (storageError) {
+        console.error('Error deleting from storage:', storageError);
       }
       
       res.status(200).json({ success: true });

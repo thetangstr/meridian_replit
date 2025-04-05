@@ -438,15 +438,31 @@ export function MediaCapture({
           const url = URL.createObjectURL(file);
           const video = document.createElement('video');
           
-          // Wait for video metadata to load
-          await new Promise((resolve, reject) => {
-            video.onloadedmetadata = resolve;
-            video.onerror = reject;
+          // Wait for video metadata to load with a timeout to prevent hanging
+          await new Promise<void>((resolve, reject) => {
+            video.onloadedmetadata = () => resolve();
+            video.onerror = (e) => reject(e);
+            
+            // Add timeout safety in case metadata loading hangs
+            const timeout = setTimeout(() => {
+              console.log("Video metadata load timed out, proceeding with upload");
+              resolve();
+            }, 5000); // 5 second timeout
+            
+            // Cleanup function
+            video.onloadeddata = () => clearTimeout(timeout);
+            
+            // Set video source last to start loading
             video.src = url;
+            video.load(); // Explicitly load the video
           });
           
-          // Check if video is too long (duration is in seconds)
-          if (video.duration > MAX_RECORDING_TIME) {
+          // Add a small buffer to the MAX_RECORDING_TIME to prevent false positives
+          // Some videos report slightly longer durations than actual
+          const maxTimeWithBuffer = MAX_RECORDING_TIME + 3; // Add 3 seconds buffer
+          
+          // Only validate if we have a valid duration
+          if (video.duration && !isNaN(video.duration) && video.duration > maxTimeWithBuffer) {
             URL.revokeObjectURL(url);
             toast({
               variant: "destructive",
@@ -460,6 +476,12 @@ export function MediaCapture({
         } catch (error) {
           console.error("Error checking video duration:", error);
           // Continue with upload if we can't check the duration
+          // Log more details about the file for debugging
+          console.log("Video file details:", {
+            name: file.name,
+            size: file.size,
+            type: file.type
+          });
         }
       }
       
