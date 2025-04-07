@@ -11,6 +11,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { CarSelectionDialog } from "@/components/dialogs/car-selection-dialog";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { Progress } from "@/components/ui/progress";
+
+interface CompletionStatus {
+  completedTasks: number;
+  totalTasks: number;
+}
 
 export default function ReviewerDashboard() {
   const [_, setLocation] = useLocation();
@@ -21,6 +27,12 @@ export default function ReviewerDashboard() {
   
   const { data: reviews, isLoading, error } = useQuery<ReviewWithDetails[]>({
     queryKey: ['/api/reviews'],
+  });
+  
+  // Get task completion data for all reviews
+  const { data: completionStatus, isLoading: isLoadingCompletion } = useQuery<Record<string, CompletionStatus>>({
+    queryKey: ['/api/reviews-completion-status'],
+    enabled: !!reviews && reviews.length > 0,
   });
   
   // Create new review mutation
@@ -205,6 +217,24 @@ export default function ReviewerDashboard() {
                       {text}
                     </div>
                   </div>
+                  {/* Progress Indicator */}
+                  <div className="mt-3">
+                    <div className="flex justify-between items-center text-xs text-muted-foreground mb-1">
+                      <span>Completion Progress</span>
+                      <span>
+                        {completionStatus && completionStatus[review.id] ? 
+                          `${completionStatus[review.id].completedTasks} / ${completionStatus[review.id].totalTasks} tasks` : 
+                          "Loading..."}
+                      </span>
+                    </div>
+                    <Progress 
+                      value={completionStatus && completionStatus[review.id] ? 
+                        (completionStatus[review.id].completedTasks / 
+                        completionStatus[review.id].totalTasks) * 100 : 0} 
+                      className="h-2"
+                    />
+                  </div>
+
                   <div className="mt-4 flex justify-between items-center">
                     <div>
                       <p className="text-sm text-muted-foreground">Due Date:</p>

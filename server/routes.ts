@@ -18,6 +18,7 @@ import {
   insertReportSchema,
   insertCarSchema,
   insertReviewSchema,
+  insertReviewerAssignmentSchema,
   userRoles,
   scoringConfig
 } from "@shared/schema";
@@ -598,6 +599,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Completion status routes
+  app.get('/api/reviews/:reviewId/completion-status', isAuthenticated, async (req, res) => {
+    const reviewId = parseInt(req.params.reviewId);
+    if (isNaN(reviewId)) {
+      return res.status(400).json({ error: 'Invalid review ID' });
+    }
+    
+    const review = await storage.getReview(reviewId);
+    if (!review) {
+      return res.status(404).json({ error: 'Review not found' });
+    }
+    
+    // Check if user has access to this review
+    const authenticatedReq = req as AuthenticatedRequest;
+    if (authenticatedReq.user.role !== 'admin' && review.reviewerId !== authenticatedReq.user.id) {
+      return res.status(403).json({ error: 'You do not have permission to view this review' });
+    }
+    
+    try {
+      const completedTaskIds = await storage.getCompletedTaskIds(reviewId);
+      const tasks = await storage.getTasksForReview(reviewId);
+      
+      const completionStatus = {
+        completedTasks: completedTaskIds.length,
+        totalTasks: tasks.length
+      };
+      
+      res.json(completionStatus);
+    } catch (error) {
+      console.error('Error fetching completion status:', error);
+      res.status(500).json({ error: String(error) });
+    }
+  });
+  
+  // Get completion status for all reviews in a batch
+  app.get('/api/reviews-completion-status', isAuthenticated, async (req, res) => {
+    const authenticatedReq = req as AuthenticatedRequest;
+    const userId = authenticatedReq.user.id;
+    const isAdmin = authenticatedReq.user.role === 'admin';
+    
+    try {
+      // Get all reviews for this user (or all reviews for admin)
+      const reviews = isAdmin 
+        ? await storage.getAllReviews() 
+        : await storage.getReviewsByReviewer(userId);
+      
+      const result: Record<string, {completedTasks: number, totalTasks: number}> = {};
+      
+      // Process each review to get its completion status
+      for (const review of reviews) {
+        const completedTaskIds = await storage.getCompletedTaskIds(review.id);
+        const tasks = await storage.getTasksForReview(review.id);
+        
+        result[review.id] = {
+          completedTasks: completedTaskIds.length,
+          totalTasks: tasks.length
+        };
+      }
+      
+      res.json(result);
+    } catch (error) {
+      console.error('Error fetching completion statuses:', error);
+      res.status(500).json({ error: String(error) });
+    }
+  });
+  
   // Report routes
   app.get('/api/reports/:id', isAuthenticated, async (req, res) => {
     const reportId = parseInt(req.params.id);
@@ -612,7 +679,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // If not admin or internal, return limited details
-      if (req.user.role === 'external') {
+      const authenticatedReq = req as AuthenticatedRequest;
+      if (authenticatedReq.user.role === 'external') {
         // Filter sensitive information for external users
         const limitedReport = {
           ...report,
@@ -881,6 +949,140 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Serve uploaded files
   app.use('/uploads', express.static(uploadsDir));
+  
+  // Reviewer Assignment routes
+  app.get('/api/reviewer-assignments', isAuthenticated, async (req, res) => {
+    try {
+      let assignments = [];
+      
+      // Different behavior based on role
+      if ((req as AuthenticatedRequest).user.role === 'admin') {
+        // Admin can see all assignments
+        const cars = await storage.getAllCars();
+        for (const car of cars) {
+          const carAssignments = await storage.getReviewerAssignmentsForCar(car.id);
+          assignments = [...assignments, ...carAssignments];
+        }
+      } else {
+        // Reviewers only see their own assignments
+        assignments = await storage.getReviewerAssignmentsForReviewer((req as AuthenticatedRequest).user.id);
+      }
+      
+      res.json(assignments);
+    } catch (error) {
+      res.status(500).json({ error: String(error) });
+    }
+  });
+  
+  app.get('/api/reviewer-assignments/:id', isAuthenticated, async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) {
+      return res.status(400).json({ error: 'Invalid assignment ID' });
+    }
+    
+    try {
+      const assignment = await storage.getReviewerAssignment(id);
+      if (!assignment) {
+        return res.status(404).json({ error: 'Assignment not found' });
+      }
+      
+      // Check permissions - Admin can view all, reviewers only their own
+      if ((req as AuthenticatedRequest).user.role !== 'admin' && 
+          assignment.reviewerId !== (req as AuthenticatedRequest).user.id) {
+        return res.status(403).json({ error: 'You do not have permission to view this assignment' });
+      }
+      
+      res.json(assignment);
+    } catch (error) {
+      res.status(500).json({ error: String(error) });
+    }
+  });
+  
+  app.get('/api/reviewer-assignments/car/:carId', isAuthenticated, hasRole(['admin']), async (req, res) => {
+    const carId = parseInt(req.params.carId);
+    if (isNaN(carId)) {
+      return res.status(400).json({ error: 'Invalid car ID' });
+    }
+    
+    try {
+      const assignments = await storage.getReviewerAssignmentsForCar(carId);
+      res.json(assignments);
+    } catch (error) {
+      res.status(500).json({ error: String(error) });
+    }
+  });
+  
+  app.get('/api/reviewer-assignments/reviewer/:reviewerId', isAuthenticated, hasRole(['admin']), async (req, res) => {
+    const reviewerId = parseInt(req.params.reviewerId);
+    if (isNaN(reviewerId)) {
+      return res.status(400).json({ error: 'Invalid reviewer ID' });
+    }
+    
+    try {
+      const assignments = await storage.getReviewerAssignmentsForReviewer(reviewerId);
+      res.json(assignments);
+    } catch (error) {
+      res.status(500).json({ error: String(error) });
+    }
+  });
+  
+  app.post('/api/reviewer-assignments', isAuthenticated, hasRole(['admin']), async (req, res) => {
+    try {
+      const assignmentData = insertReviewerAssignmentSchema.parse({
+        ...req.body,
+        createdBy: (req as AuthenticatedRequest).user.id
+      });
+      
+      const assignment = await storage.createReviewerAssignment(assignmentData);
+      res.status(201).json(assignment);
+    } catch (error) {
+      res.status(400).json({ error: String(error) });
+    }
+  });
+  
+  app.delete('/api/reviewer-assignments/:id', isAuthenticated, hasRole(['admin']), async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) {
+      return res.status(400).json({ error: 'Invalid assignment ID' });
+    }
+    
+    try {
+      const success = await storage.deleteReviewerAssignment(id);
+      if (!success) {
+        return res.status(404).json({ error: 'Assignment not found' });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: String(error) });
+    }
+  });
+  
+  // Reviews completion status endpoint
+  app.get('/api/reviews-completion-status', isAuthenticated, async (req, res) => {
+    try {
+      const reviews = (req as AuthenticatedRequest).user.role === 'admin' 
+        ? await storage.getAllReviews()
+        : await storage.getReviewsByReviewer((req as AuthenticatedRequest).user.id);
+      
+      const reviewCompletionStatus = {};
+      
+      for (const review of reviews) {
+        // Get all tasks for this review
+        const tasks = await storage.getTasksForReview(review.id);
+        const completedTaskIds = await storage.getCompletedTaskIds(review.id);
+        
+        reviewCompletionStatus[review.id] = {
+          completedTasks: completedTaskIds.length,
+          totalTasks: tasks.length
+        };
+      }
+      
+      res.json(reviewCompletionStatus);
+    } catch (error) {
+      res.status(500).json({ error: String(error) });
+    }
+  });
   
   // Create HTTP server
   const httpServer = createServer(app);

@@ -40,7 +40,11 @@ import {
   MediaItem,
   cujDatabaseVersions,
   CujDatabaseVersion,
-  InsertCujDatabaseVersion
+  InsertCujDatabaseVersion,
+  reviewerAssignments,
+  ReviewerAssignment,
+  InsertReviewerAssignment,
+  ReviewerAssignmentWithDetails
 } from "@shared/schema";
 import { calculateTaskScore, calculateCategoryScore } from "../client/src/lib/utils";
 
@@ -126,6 +130,19 @@ export interface IStorage {
   // CUJ Data Sync
   getCujSyncStatus(): Promise<{ lastSync: string, status: string }>;
   syncCujData(spreadsheetData?: any): Promise<{ success: boolean, message: string, versionId?: number }>;
+  
+  // Reviewer Assignment operations
+  getReviewerAssignment(id: number): Promise<ReviewerAssignmentWithDetails | undefined>;
+  getReviewerAssignmentByReviewerCarCategory(
+    reviewerId: number, 
+    carId: number, 
+    categoryId: number
+  ): Promise<ReviewerAssignment | undefined>;
+  getReviewerAssignmentsForReviewer(reviewerId: number): Promise<ReviewerAssignmentWithDetails[]>;
+  getReviewerAssignmentsForCar(carId: number): Promise<ReviewerAssignmentWithDetails[]>;
+  getReviewerAssignmentsForCategory(categoryId: number): Promise<ReviewerAssignmentWithDetails[]>;
+  createReviewerAssignment(assignment: InsertReviewerAssignment): Promise<ReviewerAssignment>;
+  deleteReviewerAssignment(id: number): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -141,6 +158,7 @@ export class MemStorage implements IStorage {
   private reports: Map<number, Report>;
   private cujSyncData: { lastSync: string, status: string };
   private cujDatabaseVersions: Map<number, CujDatabaseVersion>;
+  private reviewerAssignments: Map<number, ReviewerAssignment>;
   
   private userIdCounter: number = 1;
   private categoryIdCounter: number = 1;
@@ -152,6 +170,7 @@ export class MemStorage implements IStorage {
   private categoryEvalIdCounter: number = 1;
   private reportIdCounter: number = 1;
   private cujDatabaseVersionIdCounter: number = 1;
+  private reviewerAssignmentIdCounter: number = 1;
 
   constructor() {
     this.users = new Map();
@@ -164,6 +183,7 @@ export class MemStorage implements IStorage {
     this.categoryEvaluations = new Map();
     this.reports = new Map();
     this.cujDatabaseVersions = new Map();
+    this.reviewerAssignments = new Map();
     
     // Initialize with default scoring config
     this.scoringConfig = {
@@ -1255,6 +1275,172 @@ export class MemStorage implements IStorage {
       message: `CUJ database synchronized successfully. Created version: ${versionName}`,
       versionId: newVersion.id
     };
+  }
+  
+  // Reviewer Assignment operations
+  async getReviewerAssignment(id: number): Promise<ReviewerAssignmentWithDetails | undefined> {
+    const assignment = this.reviewerAssignments.get(id);
+    if (!assignment) {
+      return undefined;
+    }
+    
+    const reviewer = await this.getUser(assignment.reviewerId);
+    const category = await this.getCujCategory(assignment.categoryId);
+    const car = await this.getCar(assignment.carId);
+    
+    if (!reviewer || !category || !car) {
+      return undefined;
+    }
+    
+    let createdByUser: User | undefined;
+    if (assignment.createdBy) {
+      createdByUser = await this.getUser(assignment.createdBy);
+    }
+    
+    return {
+      ...assignment,
+      reviewer,
+      category,
+      car,
+      createdByUser
+    };
+  }
+  
+  async getReviewerAssignmentByReviewerCarCategory(
+    reviewerId: number, 
+    carId: number, 
+    categoryId: number
+  ): Promise<ReviewerAssignment | undefined> {
+    for (const assignment of this.reviewerAssignments.values()) {
+      if (assignment.reviewerId === reviewerId && 
+          assignment.carId === carId && 
+          assignment.categoryId === categoryId) {
+        return assignment;
+      }
+    }
+    return undefined;
+  }
+  
+  async getReviewerAssignmentsForReviewer(reviewerId: number): Promise<ReviewerAssignmentWithDetails[]> {
+    const assignments: ReviewerAssignmentWithDetails[] = [];
+    
+    for (const assignment of this.reviewerAssignments.values()) {
+      if (assignment.reviewerId === reviewerId) {
+        const reviewer = await this.getUser(assignment.reviewerId);
+        const category = await this.getCujCategory(assignment.categoryId);
+        const car = await this.getCar(assignment.carId);
+        
+        if (reviewer && category && car) {
+          let createdByUser: User | undefined;
+          if (assignment.createdBy) {
+            createdByUser = await this.getUser(assignment.createdBy);
+          }
+          
+          assignments.push({
+            ...assignment,
+            reviewer,
+            category,
+            car,
+            createdByUser
+          });
+        }
+      }
+    }
+    
+    return assignments;
+  }
+  
+  async getReviewerAssignmentsForCar(carId: number): Promise<ReviewerAssignmentWithDetails[]> {
+    const assignments: ReviewerAssignmentWithDetails[] = [];
+    
+    for (const assignment of this.reviewerAssignments.values()) {
+      if (assignment.carId === carId) {
+        const reviewer = await this.getUser(assignment.reviewerId);
+        const category = await this.getCujCategory(assignment.categoryId);
+        const car = await this.getCar(assignment.carId);
+        
+        if (reviewer && category && car) {
+          let createdByUser: User | undefined;
+          if (assignment.createdBy) {
+            createdByUser = await this.getUser(assignment.createdBy);
+          }
+          
+          assignments.push({
+            ...assignment,
+            reviewer,
+            category,
+            car,
+            createdByUser
+          });
+        }
+      }
+    }
+    
+    return assignments;
+  }
+  
+  async getReviewerAssignmentsForCategory(categoryId: number): Promise<ReviewerAssignmentWithDetails[]> {
+    const assignments: ReviewerAssignmentWithDetails[] = [];
+    
+    for (const assignment of this.reviewerAssignments.values()) {
+      if (assignment.categoryId === categoryId) {
+        const reviewer = await this.getUser(assignment.reviewerId);
+        const category = await this.getCujCategory(assignment.categoryId);
+        const car = await this.getCar(assignment.carId);
+        
+        if (reviewer && category && car) {
+          let createdByUser: User | undefined;
+          if (assignment.createdBy) {
+            createdByUser = await this.getUser(assignment.createdBy);
+          }
+          
+          assignments.push({
+            ...assignment,
+            reviewer,
+            category,
+            car,
+            createdByUser
+          });
+        }
+      }
+    }
+    
+    return assignments;
+  }
+  
+  async createReviewerAssignment(assignment: InsertReviewerAssignment): Promise<ReviewerAssignment> {
+    // Check if assignment already exists for this reviewer, car, and category
+    const existingAssignment = await this.getReviewerAssignmentByReviewerCarCategory(
+      assignment.reviewerId,
+      assignment.carId,
+      assignment.categoryId
+    );
+    
+    if (existingAssignment) {
+      throw new Error("A reviewer assignment for this reviewer, car, and category already exists");
+    }
+    
+    const id = this.reviewerAssignmentIdCounter++;
+    const now = new Date().toISOString();
+    
+    const newAssignment: ReviewerAssignment = {
+      id,
+      ...assignment,
+      createdAt: now,
+      updatedAt: now
+    };
+    
+    this.reviewerAssignments.set(id, newAssignment);
+    return newAssignment;
+  }
+  
+  async deleteReviewerAssignment(id: number): Promise<boolean> {
+    const exists = this.reviewerAssignments.has(id);
+    if (exists) {
+      this.reviewerAssignments.delete(id);
+      return true;
+    }
+    return false;
   }
   
   // Media operations

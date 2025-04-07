@@ -322,6 +322,34 @@ export type MediaItem = {
   createdAt: string;
 };
 
+// Reviewer Assignments
+export const reviewerAssignments = pgTable("reviewer_assignments", {
+  id: serial("id").primaryKey(),
+  reviewerId: integer("reviewer_id").notNull().references(() => users.id),
+  categoryId: integer("category_id").notNull().references(() => cujCategories.id),
+  carId: integer("car_id").notNull().references(() => cars.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  createdBy: integer("created_by").references(() => users.id),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertReviewerAssignmentSchema = createInsertSchema(reviewerAssignments).pick({
+  reviewerId: true,
+  categoryId: true,
+  carId: true,
+  createdBy: true,
+});
+
+export type ReviewerAssignment = typeof reviewerAssignments.$inferSelect;
+export type InsertReviewerAssignment = z.infer<typeof insertReviewerAssignmentSchema>;
+
+export type ReviewerAssignmentWithDetails = ReviewerAssignment & {
+  reviewer: User;
+  category: CujCategory;
+  car: Car;
+  createdByUser?: User;
+};
+
 // Scoring Scale Descriptions
 export const scoringScaleDescriptions = {
   usability: {

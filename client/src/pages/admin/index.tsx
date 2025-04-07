@@ -12,7 +12,10 @@ import {
   Cuj,
   Task,
   TaskWithCategory,
-  CujDatabaseVersion
+  CujDatabaseVersion,
+  ReviewerAssignmentWithDetails,
+  User,
+  Car
 } from "@shared/schema";
 import { 
   Loader2, 
@@ -25,7 +28,12 @@ import {
   Search,
   CheckCircle2,
   Database,
-  Upload
+  Upload,
+  PlusCircle,
+  Trash,
+  UserCheck,
+  X,
+  AlertTriangle
 } from "lucide-react";
 import { formatDateTime } from "@/lib/utils";
 import { 
@@ -49,6 +57,15 @@ export default function AdminDashboard() {
   // State for tracking if weights have been changed
   const [taskWeightsChanged, setTaskWeightsChanged] = useState(false);
   const [categoryWeightsChanged, setCategoryWeightsChanged] = useState(false);
+  
+  // State for reviewer assignment management
+  const [isCreateAssignmentOpen, setIsCreateAssignmentOpen] = useState(false);
+  const [newAssignment, setNewAssignment] = useState({
+    reviewerId: 0,
+    carId: 0,
+    categoryId: 0
+  });
+  const [existingAssignment, setExistingAssignment] = useState<ReviewerAssignmentWithDetails | null>(null);
   
   // Fetch current scoring configuration
   const { data: config, isLoading: isLoadingConfig } = useQuery<ScoringConfig>({
@@ -83,6 +100,21 @@ export default function AdminDashboard() {
   // Fetch Tasks
   const { data: tasks, isLoading: isLoadingTasks } = useQuery<TaskWithCategory[]>({
     queryKey: ['/api/tasks'],
+  });
+  
+  // Fetch Users
+  const { data: users, isLoading: isLoadingUsers } = useQuery<User[]>({
+    queryKey: ['/api/users'],
+  });
+  
+  // Fetch Cars
+  const { data: cars, isLoading: isLoadingCars } = useQuery<Car[]>({
+    queryKey: ['/api/cars'],
+  });
+  
+  // Fetch Reviewer Assignments
+  const { data: reviewerAssignments, isLoading: isLoadingAssignments } = useQuery<ReviewerAssignmentWithDetails[]>({
+    queryKey: ['/api/reviewer-assignments'],
   });
   
   // State for task level weights
@@ -162,6 +194,55 @@ export default function AdminDashboard() {
     onError: (error) => {
       toast({
         title: "Error Updating Weights",
+        description: error instanceof Error ? error.message : "An unexpected error occurred",
+        variant: "destructive",
+      });
+    },
+  });
+  
+  // Create reviewer assignment mutation
+  const createAssignmentMutation = useMutation({
+    mutationFn: async (assignment: { reviewerId: number; carId: number; categoryId: number }) => {
+      return await apiRequest('/api/reviewer-assignments', {
+        method: 'POST',
+        body: JSON.stringify(assignment)
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/reviewer-assignments'] });
+      toast({
+        title: "Assignment Created",
+        description: "Reviewer assignment has been successfully created.",
+      });
+      setIsCreateAssignmentOpen(false);
+      setNewAssignment({ reviewerId: 0, carId: 0, categoryId: 0 });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error Creating Assignment",
+        description: error instanceof Error ? error.message : "An unexpected error occurred",
+        variant: "destructive",
+      });
+    },
+  });
+  
+  // Delete reviewer assignment mutation
+  const deleteAssignmentMutation = useMutation({
+    mutationFn: async (assignmentId: number) => {
+      return await apiRequest(`/api/reviewer-assignments/${assignmentId}`, {
+        method: 'DELETE'
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/reviewer-assignments'] });
+      toast({
+        title: "Assignment Removed",
+        description: "Reviewer assignment has been successfully removed.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error Removing Assignment",
         description: error instanceof Error ? error.message : "An unexpected error occurred",
         variant: "destructive",
       });
@@ -258,6 +339,59 @@ export default function AdminDashboard() {
     setActiveCujDatabaseVersion.mutate(versionId);
   };
   
+  // Handle creating a new reviewer assignment
+  const handleCreateAssignment = () => {
+    if (newAssignment.reviewerId <= 0 || newAssignment.carId <= 0 || newAssignment.categoryId <= 0) {
+      toast({
+        title: "Validation Error",
+        description: "Please select a reviewer, car, and CUJ category for the assignment.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Check if an assignment already exists
+    const existingAssignment = reviewerAssignments?.find(
+      a => a.reviewerId === newAssignment.reviewerId && 
+           a.carId === newAssignment.carId && 
+           a.categoryId === newAssignment.categoryId
+    );
+    
+    if (existingAssignment) {
+      toast({
+        title: "Assignment Already Exists",
+        description: "This reviewer is already assigned to this car and CUJ category.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Check if the category is already assigned to a different reviewer for this car
+    const conflictingAssignment = reviewerAssignments?.find(
+      a => a.carId === newAssignment.carId && 
+           a.categoryId === newAssignment.categoryId &&
+           a.reviewerId !== newAssignment.reviewerId
+    );
+    
+    if (conflictingAssignment) {
+      const reviewer = users?.find(u => u.id === conflictingAssignment.reviewerId);
+      toast({
+        title: "Category Already Assigned",
+        description: `This category for this car is already assigned to ${reviewer?.name || 'another reviewer'}. Please remove that assignment first or select a different category.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    createAssignmentMutation.mutate(newAssignment);
+  };
+  
+  // Handle deleting a reviewer assignment
+  const handleDeleteAssignment = (assignmentId: number) => {
+    // You could add a confirmation dialog here if needed
+    deleteAssignmentMutation.mutate(assignmentId);
+  };
+  
   // Filter tasks by category
   const getTasksByCategory = (categoryId: number) => {
     if (!tasks) return [];
@@ -320,9 +454,125 @@ export default function AdminDashboard() {
         <p className="text-muted-foreground mt-1">Manage configuration and view CUJ data.</p>
       </div>
       
+      {/* Create Assignment Dialog */}
+      <Dialog open={isCreateAssignmentOpen} onOpenChange={setIsCreateAssignmentOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Create New Reviewer Assignment</DialogTitle>
+            <DialogDescription>
+              Assign a reviewer to evaluate a specific CUJ category for a car.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="reviewer">Reviewer</Label>
+              <Select 
+                value={newAssignment.reviewerId.toString()}
+                onValueChange={(value) => setNewAssignment({...newAssignment, reviewerId: parseInt(value)})}
+              >
+                <SelectTrigger id="reviewer">
+                  <SelectValue placeholder="Select a reviewer" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="0">Select a reviewer</SelectItem>
+                  {users?.filter(user => user.role === 'reviewer').map(user => (
+                    <SelectItem key={user.id} value={user.id.toString()}>
+                      {user.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="car">Car</Label>
+              <Select 
+                value={newAssignment.carId.toString()}
+                onValueChange={(value) => setNewAssignment({...newAssignment, carId: parseInt(value)})}
+              >
+                <SelectTrigger id="car">
+                  <SelectValue placeholder="Select a car" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="0">Select a car</SelectItem>
+                  {cars?.map(car => (
+                    <SelectItem key={car.id} value={car.id.toString()}>
+                      {car.make} {car.model} ({car.year})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="category">CUJ Category</Label>
+              <Select 
+                value={newAssignment.categoryId.toString()}
+                onValueChange={(value) => setNewAssignment({...newAssignment, categoryId: parseInt(value)})}
+              >
+                <SelectTrigger id="category">
+                  <SelectValue placeholder="Select a category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="0">Select a category</SelectItem>
+                  {categories?.map(category => (
+                    <SelectItem key={category.id} value={category.id.toString()}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {/* Warning about existing assignments */}
+            {newAssignment.carId > 0 && newAssignment.categoryId > 0 && reviewerAssignments?.some(
+              a => a.carId === newAssignment.carId && a.categoryId === newAssignment.categoryId
+            ) && (
+              <div className="bg-amber-50 dark:bg-amber-950 p-3 rounded-md border border-amber-200 dark:border-amber-800 mt-4">
+                <div className="flex gap-2 text-amber-800 dark:text-amber-300">
+                  <AlertTriangle className="h-5 w-5 flex-shrink-0" />
+                  <div className="text-sm">
+                    <strong>Warning:</strong> This category is already assigned to another reviewer for this car. Creating a new assignment will replace the existing one.
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter className="flex space-x-2 justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsCreateAssignmentOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleCreateAssignment}
+              disabled={createAssignmentMutation.isPending}
+            >
+              {createAssignmentMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <UserCheck className="mr-2 h-4 w-4" />
+                  Create Assignment
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
       <Tabs defaultValue={activeTab} onValueChange={setActiveTab} className="mb-6">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="config">Configuration</TabsTrigger>
+          <TabsTrigger value="assignments">Reviewer Assignments</TabsTrigger>
           <TabsTrigger value="data">CUJ Data Tables</TabsTrigger>
         </TabsList>
         
@@ -629,6 +879,100 @@ export default function AdminDashboard() {
                     </Table>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+        
+        <TabsContent value="assignments" className="mt-6">
+          <div className="space-y-6">
+            {/* Current Assignments */}
+            <Card className="overflow-hidden">
+              <div className="p-4 bg-primary bg-opacity-5 border-b border-gray-200 flex items-center justify-between">
+                <h3 className="font-medium text-lg text-primary">Current Reviewer Assignments</h3>
+                <Button 
+                  size="sm"
+                  className="gap-1"
+                  onClick={() => {
+                    // Open the create assignment dialog
+                    setIsCreateAssignmentOpen(true);
+                  }}
+                >
+                  <PlusCircle className="h-4 w-4" />
+                  <span>New Assignment</span>
+                </Button>
+              </div>
+              
+              <CardContent className="p-4">
+                {isLoadingAssignments || isLoadingUsers || isLoadingCars || isLoadingCategories ? (
+                  <div className="flex justify-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  </div>
+                ) : reviewerAssignments?.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground">No reviewer assignments have been made yet.</p>
+                    <Button 
+                      variant="outline" 
+                      className="mt-4"
+                      onClick={() => setIsCreateAssignmentOpen(true)}
+                    >
+                      <PlusCircle className="mr-1 h-4 w-4" />
+                      Create your first assignment
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Reviewer</TableHead>
+                          <TableHead>Car</TableHead>
+                          <TableHead>CUJ Category</TableHead>
+                          <TableHead>Created</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {reviewerAssignments?.map((assignment) => (
+                          <TableRow key={assignment.id}>
+                            <TableCell>
+                              <div className="font-medium">{assignment.reviewer.name}</div>
+                              <div className="text-xs text-muted-foreground">{assignment.reviewer.username}</div>
+                            </TableCell>
+                            <TableCell>
+                              <div>{assignment.car.make} {assignment.car.model}</div>
+                              <div className="text-xs text-muted-foreground">{assignment.car.year}</div>
+                            </TableCell>
+                            <TableCell>{assignment.category.name}</TableCell>
+                            <TableCell>
+                              {formatDateTime(assignment.createdAt)}
+                              {assignment.createdByUser && (
+                                <div className="text-xs text-muted-foreground">
+                                  by {assignment.createdByUser.name}
+                                </div>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => handleDeleteAssignment(assignment.id)}
+                                disabled={deleteAssignmentMutation.isPending}
+                              >
+                                {deleteAssignmentMutation.isPending && deleteAssignmentMutation.variables === assignment.id ? (
+                                  <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                                ) : (
+                                  <Trash className="h-3 w-3 mr-1" />
+                                )}
+                                Remove
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
