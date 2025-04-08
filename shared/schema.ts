@@ -118,14 +118,20 @@ export const reviews = pgTable("reviews", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export const insertReviewSchema = createInsertSchema(reviews).pick({
-  carId: true,
-  reviewerId: true,
-  status: true,
-  startDate: true,
-  endDate: true,
-  cujDatabaseVersionId: true,
-});
+export const insertReviewSchema = createInsertSchema(reviews)
+  .pick({
+    carId: true,
+    reviewerId: true,
+    status: true,
+    startDate: true,
+    endDate: true,
+    cujDatabaseVersionId: true,
+  })
+  .transform((data) => ({
+    ...data,
+    startDate: new Date(data.startDate),
+    endDate: new Date(data.endDate),
+  }));
 
 export const updateReviewSchema = createInsertSchema(reviews).pick({
   status: true,

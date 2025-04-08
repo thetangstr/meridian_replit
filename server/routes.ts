@@ -320,7 +320,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         cujDatabaseVersionId: activeVersion?.id || null
       };
       
-      console.log('Processed review data:', reviewData);
+      // Handle date conversion if they come in as strings
+      if (reviewData.startDate && typeof reviewData.startDate === 'string') {
+        reviewData.startDate = new Date(reviewData.startDate);
+      }
+      
+      if (reviewData.endDate && typeof reviewData.endDate === 'string') {
+        reviewData.endDate = new Date(reviewData.endDate);
+      }
+      
+      console.log('Processed review data with date conversion:', reviewData);
       
       // Parse and validate the data
       const validatedData = insertReviewSchema.parse(reviewData);
