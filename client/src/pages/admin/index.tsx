@@ -45,6 +45,21 @@ import {
   TableRow 
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export default function AdminDashboard() {
   const { toast } = useToast();
@@ -386,10 +401,23 @@ export default function AdminDashboard() {
     createAssignmentMutation.mutate(newAssignment);
   };
   
+  // State for delete assignment confirmation dialog
+  const [isDeleteAssignmentOpen, setIsDeleteAssignmentOpen] = useState(false);
+  const [assignmentToDelete, setAssignmentToDelete] = useState<ReviewerAssignmentWithDetails | null>(null);
+
+  // Handle showing delete confirmation dialog
+  const handleShowDeleteDialog = (assignment: ReviewerAssignmentWithDetails) => {
+    setAssignmentToDelete(assignment);
+    setIsDeleteAssignmentOpen(true);
+  };
+  
   // Handle deleting a reviewer assignment
-  const handleDeleteAssignment = (assignmentId: number) => {
-    // You could add a confirmation dialog here if needed
-    deleteAssignmentMutation.mutate(assignmentId);
+  const handleDeleteAssignment = () => {
+    if (!assignmentToDelete) return;
+    
+    deleteAssignmentMutation.mutate(assignmentToDelete.id);
+    setIsDeleteAssignmentOpen(false);
+    setAssignmentToDelete(null);
   };
   
   // Filter tasks by category
@@ -453,6 +481,78 @@ export default function AdminDashboard() {
         <h2 className="text-2xl font-medium text-foreground">Admin Dashboard</h2>
         <p className="text-muted-foreground mt-1">Manage configuration and view CUJ data.</p>
       </div>
+      
+      {/* Delete Assignment Confirmation Dialog */}
+      <Dialog open={isDeleteAssignmentOpen} onOpenChange={setIsDeleteAssignmentOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Confirm Deletion</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this reviewer assignment?
+            </DialogDescription>
+          </DialogHeader>
+          
+          {assignmentToDelete && (
+            <div className="py-4">
+              <div className="space-y-2">
+                <div className="bg-muted p-3 rounded-md">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <div className="text-sm font-medium">Reviewer</div>
+                      <div className="text-sm">{assignmentToDelete.reviewer.name}</div>
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium">Car</div>
+                      <div className="text-sm">{assignmentToDelete.car.make} {assignmentToDelete.car.model}</div>
+                    </div>
+                    <div className="col-span-2">
+                      <div className="text-sm font-medium">Category</div>
+                      <div className="text-sm">{assignmentToDelete.category.name}</div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="bg-amber-50 dark:bg-amber-950 p-3 rounded-md border border-amber-200 dark:border-amber-800">
+                  <div className="flex gap-2 text-amber-800 dark:text-amber-300">
+                    <AlertTriangle className="h-5 w-5 flex-shrink-0" />
+                    <div className="text-sm">
+                      <strong>Warning:</strong> Deleting this assignment will remove the reviewer's access to evaluate this CUJ category for this car. Any existing evaluations will remain but can no longer be modified by this reviewer.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          <DialogFooter className="flex space-x-2 justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsDeleteAssignmentOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleDeleteAssignment}
+              disabled={deleteAssignmentMutation.isPending}
+            >
+              {deleteAssignmentMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash className="mr-2 h-4 w-4" />
+                  Delete Assignment
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       
       {/* Create Assignment Dialog */}
       <Dialog open={isCreateAssignmentOpen} onOpenChange={setIsCreateAssignmentOpen}>
@@ -575,6 +675,113 @@ export default function AdminDashboard() {
           <TabsTrigger value="assignments">Reviewer Assignments</TabsTrigger>
           <TabsTrigger value="data">CUJ Data Tables</TabsTrigger>
         </TabsList>
+        
+        <TabsContent value="assignments" className="space-y-6 mt-6">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-medium">Reviewer Assignments</h3>
+              <Button 
+                onClick={() => setIsCreateAssignmentOpen(true)}
+                className="flex items-center"
+              >
+                <PlusCircle className="mr-1 h-4 w-4" />
+                Create Assignment
+              </Button>
+            </div>
+            
+            {isLoadingUsers || isLoadingCars || isLoadingCategories || isLoadingAssignments ? (
+              <div className="flex items-center justify-center h-40">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            ) : !reviewerAssignments || reviewerAssignments.length === 0 ? (
+              <Card>
+                <CardContent className="p-6 text-center">
+                  <p className="text-muted-foreground mb-4">No reviewer assignments have been created yet.</p>
+                  <Button 
+                    onClick={() => setIsCreateAssignmentOpen(true)}
+                    variant="outline"
+                    className="mx-auto"
+                  >
+                    <PlusCircle className="mr-1 h-4 w-4" />
+                    Create Your First Assignment
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+                  <h4 className="font-medium">Current Assignments</h4>
+                  <div className="flex items-center space-x-2">
+                    <Input
+                      placeholder="Search assignments"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="max-w-xs"
+                    />
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Reviewer</TableHead>
+                        <TableHead>Car</TableHead>
+                        <TableHead>Category</TableHead>
+                        <TableHead>Created At</TableHead>
+                        <TableHead className="w-20 text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {reviewerAssignments
+                        .filter(assignment => {
+                          if (!searchTerm) return true;
+                          const searchLower = searchTerm.toLowerCase();
+                          return (
+                            assignment.reviewer.name.toLowerCase().includes(searchLower) ||
+                            assignment.car.make.toLowerCase().includes(searchLower) ||
+                            assignment.car.model.toLowerCase().includes(searchLower) ||
+                            assignment.category.name.toLowerCase().includes(searchLower)
+                          );
+                        })
+                        .map(assignment => (
+                          <TableRow key={assignment.id}>
+                            <TableCell>
+                              <div className="font-medium">{assignment.reviewer.name}</div>
+                              <div className="text-xs text-muted-foreground">{assignment.reviewer.role}</div>
+                            </TableCell>
+                            <TableCell>
+                              <div>{assignment.car.make} {assignment.car.model}</div>
+                              <div className="text-xs text-muted-foreground">{assignment.car.year}</div>
+                            </TableCell>
+                            <TableCell>
+                              <div>{assignment.category.name}</div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="text-sm">{formatDateTime(assignment.createdAt)}</div>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button 
+                                variant="ghost" 
+                                size="icon"
+                                onClick={() => handleShowDeleteDialog(assignment)}
+                                disabled={deleteAssignmentMutation.isPending}
+                              >
+                                {deleteAssignmentMutation.isPending && assignmentToDelete?.id === assignment.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Trash className="h-4 w-4 text-destructive" />
+                                )}
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </Card>
+            )}
+          </div>
+        </TabsContent>
         
         <TabsContent value="config" className="space-y-6 mt-6">
           <div className="space-y-6">
