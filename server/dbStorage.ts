@@ -1,6 +1,11 @@
 import { eq, and, desc, sql } from "drizzle-orm";
 import { db } from "../shared/db";
 import * as schema from "../shared/schema";
+import { 
+  users, cujCategories, cujs, tasks, cars, reviews,
+  taskEvaluations, categoryEvaluations, reports, scoringConfig, 
+  reviewerAssignments, cujDatabaseVersions 
+} from "../shared/schema";
 import {
   User,
   InsertUser,

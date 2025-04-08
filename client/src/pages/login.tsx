@@ -13,8 +13,7 @@ import { Car, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const loginSchema = z.object({
-  username: z.string().min(1, "Username is required"),
-  password: z.string().min(1, "Password is required"),
+  username: z.string().min(1, "LDAP identifier is required"),
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
@@ -37,7 +36,6 @@ export default function Login() {
     resolver: zodResolver(loginSchema),
     defaultValues: {
       username: "",
-      password: "",
     },
   });
 
@@ -45,7 +43,7 @@ export default function Login() {
     console.log("Form submitted with:", data);
     setIsLoggingIn(true);
     try {
-      await login(data.username, data.password);
+      await login(data.username);
       // The redirection is handled by the useEffect above
     } catch (err) {
       console.error("Login error in form:", err);
@@ -53,7 +51,7 @@ export default function Login() {
       
       toast({
         title: "Login Failed",
-        description: error || "Invalid username or password",
+        description: error || "Invalid LDAP identifier",
         variant: "destructive",
       });
     } finally {
@@ -66,19 +64,15 @@ export default function Login() {
     switch(role) {
       case 'reviewer':
         form.setValue('username', 'reviewer');
-        form.setValue('password', 'review123');
         break;
       case 'admin':
         form.setValue('username', 'admin');
-        form.setValue('password', 'admin123');
         break;
       case 'internal':
         form.setValue('username', 'internal');
-        form.setValue('password', 'internal123');
         break;
       case 'external':
         form.setValue('username', 'external');
-        form.setValue('password', 'external123');
         break;
     }
   };
@@ -105,10 +99,10 @@ export default function Login() {
               <AlertDescription>
                 Please use one of the following test accounts:
                 <div className="mt-2 text-xs bg-white/20 p-2 rounded">
-                  <div><strong>Reviewer:</strong> username: reviewer, password: review123</div>
-                  <div><strong>Admin:</strong> username: admin, password: admin123</div>
-                  <div><strong>Internal:</strong> username: internal, password: internal123</div>
-                  <div><strong>External:</strong> username: external, password: external123</div>
+                  <div><strong>Reviewer:</strong> username: reviewer</div>
+                  <div><strong>Admin:</strong> username: admin</div>
+                  <div><strong>Internal:</strong> username: internal</div>
+                  <div><strong>External:</strong> username: external</div>
                 </div>
               </AlertDescription>
             </Alert>
@@ -129,19 +123,7 @@ export default function Login() {
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Password</FormLabel>
-                    <FormControl>
-                      <Input type="password" placeholder="••••••••" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+
               <Button type="submit" className="w-full" disabled={isLoggingIn}>
                 {isLoggingIn ? "Logging in..." : "Sign In"}
               </Button>

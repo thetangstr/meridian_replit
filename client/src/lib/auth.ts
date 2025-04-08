@@ -6,7 +6,7 @@ interface AuthState {
   user: User | null;
   loading: boolean;
   error: string | null;
-  login: (username: string, password: string) => Promise<void>;
+  login: (username: string, password?: string) => Promise<void>;
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
 }
@@ -17,15 +17,15 @@ export const useAuth = create<AuthState>((set) => ({
   loading: true,
   error: null,
   
-  login: async (username: string, password: string) => {
-    console.log(`Attempting login with username: ${username}`);
+  login: async (username: string, password: string = '') => {
+    console.log(`Attempting login with LDAP: ${username}`);
     set({ loading: true, error: null });
     try {
       console.log('Making login request...');
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ username, password }), // Password is optional as we only use LDAP
         credentials: 'include',
       });
       
@@ -138,7 +138,7 @@ export const useAuth = create<AuthState>((set) => ({
               const loginRes = await fetch('/api/auth/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username: 'reviewer', password: 'review123' }),
+                body: JSON.stringify({ username: 'reviewer' }),
                 credentials: 'include',
               });
               

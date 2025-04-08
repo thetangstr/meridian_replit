@@ -9,8 +9,7 @@ COOKIE_JAR="cookies.txt"
 curl -s -c "$COOKIE_JAR" -X POST "$API_BASE/auth/login" \
   -H "Content-Type: application/json" \
   -d '{
-    "username": "admin",
-    "password": "password123"
+    "username": "admin"
   }'
 
 # Function to make authenticated API calls

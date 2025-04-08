@@ -251,8 +251,7 @@ export const insertReportSchema = createInsertSchema(reports).pick({
 // Types
 export interface User {
   id: number;
-  username: string;
-  password: string;
+  username: string; // This will be the LDAP identifier
   name: string;
   role: string;
 }

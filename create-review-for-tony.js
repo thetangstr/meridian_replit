@@ -9,7 +9,6 @@ async function loginAsTony() {
     },
     body: JSON.stringify({
       username: 'tony',
-      password: 'password123',
     }),
   });
 

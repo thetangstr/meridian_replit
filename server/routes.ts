@@ -28,8 +28,7 @@ declare global {
   namespace Express {
     interface User {
       id: number;
-      username: string;
-      password: string;
+      username: string; // LDAP identifier
       name: string;
       role: string;
     }
@@ -40,8 +39,7 @@ declare global {
 interface AuthenticatedRequest extends Request {
   user: {
     id: number;
-    username: string;
-    password: string;
+    username: string; // LDAP identifier
     name: string;
     role: string;
   };
@@ -68,16 +66,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(passport.initialize());
   app.use(passport.session());
   
-  // Configure local strategy
+  // Configure local strategy - uses LDAP identifier only (no password required)
   passport.use(new LocalStrategy(async (username, password, done) => {
     try {
       const user = await storage.getUserByUsername(username);
       if (!user) {
-        return done(null, false, { message: 'Incorrect username.' });
+        return done(null, false, { message: 'User not found with this LDAP identifier.' });
       }
-      if (user.password !== password) { // In production, use proper password hashing
-        return done(null, false, { message: 'Incorrect password.' });
-      }
+      // No password check - we only validate based on LDAP identifier
       return done(null, user);
     } catch (err) {
       return done(err);
