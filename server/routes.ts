@@ -69,17 +69,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Configure local strategy - uses LDAP identifier only (no password required)
   passport.use(new LocalStrategy({
     usernameField: 'username',
-    passwordField: 'password', // This is still needed for the structure
-    passReqToCallback: false,
-    session: true
+    passwordField: 'password', // This field is optional
+    session: true,
+    // This setting is critical to allow empty passwords
+    passReqToCallback: false
   }, async (username, password, done) => {
     try {
+      if (!username) {
+        console.log('Missing username');
+        return done(null, false, { message: 'Username is required' });
+      }
+      
       console.log(`Authenticating user with LDAP: ${username}`);
       const user = await storage.getUserByUsername(username);
       if (!user) {
         console.log(`User not found: ${username}`);
         return done(null, false, { message: 'User not found with this LDAP identifier.' });
       }
+      
       // No password check - we only validate based on LDAP identifier
       console.log(`User authenticated: ${username} (${user.id})`);
       return done(null, user);

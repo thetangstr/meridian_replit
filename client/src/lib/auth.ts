@@ -22,19 +22,35 @@ export const useAuth = create<AuthState>((set) => ({
     set({ loading: true, error: null });
     try {
       console.log('Making login request...');
+      
+      // Ensure username is provided
+      if (!username.trim()) {
+        throw new Error('Username is required');
+      }
+      
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }), // Password is optional as we only use LDAP
+        body: JSON.stringify({ 
+          username,
+          password: 'placeholder' // Send a placeholder to satisfy Passport's basic requirement
+        }), 
         credentials: 'include',
       });
       
       console.log('Login response status:', res.status);
       
       if (!res.ok) {
-        const error = await res.text();
-        console.error('Login error:', error);
-        throw new Error(error || 'Failed to login');
+        let errorMessage = 'Failed to login';
+        try {
+          const errorData = await res.json();
+          errorMessage = errorData.message || errorMessage;
+        } catch (parseError) {
+          const error = await res.text();
+          errorMessage = error || errorMessage;
+        }
+        console.error('Login error:', errorMessage);
+        throw new Error(errorMessage);
       }
       
       const user = await res.json();
@@ -138,7 +154,10 @@ export const useAuth = create<AuthState>((set) => ({
               const loginRes = await fetch('/api/auth/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username: 'reviewer' }),
+                body: JSON.stringify({ 
+                  username: 'reviewer',
+                  password: 'placeholder' // Send placeholder for Passport
+                }),
                 credentials: 'include',
               });
               
