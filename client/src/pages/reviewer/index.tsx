@@ -38,19 +38,29 @@ export default function ReviewerDashboard() {
   // Create new review mutation
   const createReviewMutation = useMutation({
     mutationFn: async (data: { carId: number }) => {
+      if (!user?.id) {
+        throw new Error("You must be logged in to create a review");
+      }
+      
       const today = new Date();
       const endDate = new Date(today);
       endDate.setDate(today.getDate() + 14); // Set due date 2 weeks from now
       
+      // Create the review payload
+      const reviewPayload = {
+        carId: data.carId,
+        reviewerId: user.id,
+        startDate: today.toISOString(),
+        endDate: endDate.toISOString(),
+        status: 'pending'
+      };
+      
+      // Debug the request payload
+      console.log("Creating review with payload:", reviewPayload);
+      
       return apiRequest<Review>('/api/reviews', {
         method: 'POST',
-        body: JSON.stringify({
-          carId: data.carId,
-          reviewerId: user?.id,
-          startDate: today.toISOString(),
-          endDate: endDate.toISOString(),
-          status: 'pending'
-        }),
+        body: JSON.stringify(reviewPayload),
       });
     },
     onSuccess: (newReview) => {

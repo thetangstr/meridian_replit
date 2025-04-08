@@ -521,6 +521,119 @@ export class DbStorage implements IStorage {
     return false;
   }
 
+  // CUJ Database Version operations
+  async getCujDatabaseVersion(id: number): Promise<CujDatabaseVersion | undefined> {
+    try {
+      const result = await db
+        .select()
+        .from(schema.cujDatabaseVersions)
+        .where(eq(schema.cujDatabaseVersions.id, id))
+        .limit(1);
+      
+      return result.length ? result[0] : undefined;
+    } catch (error) {
+      console.error('Error fetching CUJ database version:', error);
+      return undefined;
+    }
+  }
+  
+  async getActiveCujDatabaseVersion(): Promise<CujDatabaseVersion | undefined> {
+    try {
+      console.log('Fetching active CUJ database version');
+      
+      const result = await db
+        .select()
+        .from(schema.cujDatabaseVersions)
+        .where(eq(schema.cujDatabaseVersions.isActive, true))
+        .limit(1);
+      
+      if (result.length) {
+        console.log('Found active CUJ database version:', result[0]);
+        return result[0];
+      }
+      
+      // If no active version found, get the latest version
+      console.log('No active CUJ database version found, fetching latest');
+      
+      const latest = await db
+        .select()
+        .from(schema.cujDatabaseVersions)
+        .orderBy(desc(schema.cujDatabaseVersions.createdAt))
+        .limit(1);
+      
+      if (latest.length) {
+        console.log('Found latest CUJ database version:', latest[0]);
+        return latest[0];
+      }
+      
+      console.log('No CUJ database versions found at all');
+      return undefined;
+    } catch (error) {
+      console.error('Error fetching active CUJ database version:', error);
+      return undefined;
+    }
+  }
+  
+  async getAllCujDatabaseVersions(): Promise<CujDatabaseVersion[]> {
+    try {
+      return await db
+        .select()
+        .from(schema.cujDatabaseVersions)
+        .orderBy(desc(schema.cujDatabaseVersions.createdAt));
+    } catch (error) {
+      console.error('Error fetching all CUJ database versions:', error);
+      return [];
+    }
+  }
+  
+  async createCujDatabaseVersion(version: InsertCujDatabaseVersion): Promise<CujDatabaseVersion> {
+    try {
+      if (version.isActive) {
+        // Deactivate all other versions
+        await db
+          .update(schema.cujDatabaseVersions)
+          .set({ isActive: false })
+          .where(sql`1=1`); // This is like WHERE TRUE
+      }
+      
+      const result = await db
+        .insert(schema.cujDatabaseVersions)
+        .values(version)
+        .returning();
+      
+      return result[0];
+    } catch (error) {
+      console.error('Error creating CUJ database version:', error);
+      throw error;
+    }
+  }
+  
+  async setActiveCujDatabaseVersion(id: number): Promise<CujDatabaseVersion> {
+    try {
+      // Deactivate all versions
+      await db
+        .update(schema.cujDatabaseVersions)
+        .set({ isActive: false })
+        .where(sql`1=1`); // This is like WHERE TRUE
+      
+      // Activate the requested version
+      const result = await db
+        .update(schema.cujDatabaseVersions)
+        .set({ isActive: true })
+        .where(eq(schema.cujDatabaseVersions.id, id))
+        .returning();
+      
+      if (!result.length) {
+        throw new Error(`CUJ database version with ID ${id} not found`);
+      }
+      
+      return result[0];
+    } catch (error) {
+      console.error('Error setting active CUJ database version:', error);
+      throw error;
+    }
+  }
+
   // CUJ Data Sync
   private cujSyncData = {
     lastSync: new Date().toISOString(),
@@ -531,12 +644,222 @@ export class DbStorage implements IStorage {
     return this.cujSyncData;
   }
 
-  async syncCujData(): Promise<{ success: boolean, message: string }> {
-    this.cujSyncData = {
-      lastSync: new Date().toISOString(),
-      status: 'complete'
-    };
-    
-    return { success: true, message: 'Sync completed successfully' };
+  async syncCujData(spreadsheetData?: any): Promise<{ success: boolean, message: string, versionId?: number }> {
+    try {
+      // Create a new CUJ database version for this sync
+      const version = await this.createCujDatabaseVersion({
+        name: `Sync ${new Date().toISOString()}`,
+        description: 'Automatically created during CUJ data sync',
+        isActive: true,
+        createdAt: new Date().toISOString()
+      });
+      
+      this.cujSyncData = {
+        lastSync: new Date().toISOString(),
+        status: 'complete'
+      };
+      
+      return { 
+        success: true, 
+        message: 'Sync completed successfully',
+        versionId: version.id
+      };
+    } catch (error) {
+      console.error('Error syncing CUJ data:', error);
+      
+      this.cujSyncData = {
+        lastSync: new Date().toISOString(),
+        status: 'error'
+      };
+      
+      return { 
+        success: false, 
+        message: String(error) 
+      };
+    }
+  }
+  
+  // Reviewer Assignment methods
+  async getReviewerAssignment(id: number): Promise<ReviewerAssignmentWithDetails | undefined> {
+    try {
+      const result = await db
+        .select({
+          assignment: schema.reviewerAssignments,
+          reviewer: schema.users,
+          car: schema.cars,
+          category: schema.cujCategories
+        })
+        .from(schema.reviewerAssignments)
+        .leftJoin(schema.users, eq(schema.reviewerAssignments.reviewerId, schema.users.id))
+        .leftJoin(schema.cars, eq(schema.reviewerAssignments.carId, schema.cars.id))
+        .leftJoin(schema.cujCategories, eq(schema.reviewerAssignments.categoryId, schema.cujCategories.id))
+        .where(eq(schema.reviewerAssignments.id, id))
+        .limit(1);
+      
+      if (!result.length) {
+        return undefined;
+      }
+      
+      const row = result[0];
+      return {
+        ...row.assignment,
+        reviewer: row.reviewer,
+        car: row.car,
+        category: row.category
+      };
+    } catch (error) {
+      console.error('Error fetching reviewer assignment:', error);
+      return undefined;
+    }
+  }
+  
+  async getReviewerAssignmentByReviewerCarCategory(
+    reviewerId: number, 
+    carId: number, 
+    categoryId: number
+  ): Promise<ReviewerAssignment | undefined> {
+    try {
+      const result = await db
+        .select()
+        .from(schema.reviewerAssignments)
+        .where(
+          and(
+            eq(schema.reviewerAssignments.reviewerId, reviewerId),
+            eq(schema.reviewerAssignments.carId, carId),
+            eq(schema.reviewerAssignments.categoryId, categoryId)
+          )
+        )
+        .limit(1);
+      
+      return result.length ? result[0] : undefined;
+    } catch (error) {
+      console.error('Error fetching reviewer assignment by reviewer, car, and category:', error);
+      return undefined;
+    }
+  }
+  
+  async getReviewerAssignmentsForReviewer(reviewerId: number): Promise<ReviewerAssignmentWithDetails[]> {
+    try {
+      const result = await db
+        .select({
+          assignment: schema.reviewerAssignments,
+          reviewer: schema.users,
+          car: schema.cars,
+          category: schema.cujCategories
+        })
+        .from(schema.reviewerAssignments)
+        .leftJoin(schema.users, eq(schema.reviewerAssignments.reviewerId, schema.users.id))
+        .leftJoin(schema.cars, eq(schema.reviewerAssignments.carId, schema.cars.id))
+        .leftJoin(schema.cujCategories, eq(schema.reviewerAssignments.categoryId, schema.cujCategories.id))
+        .where(eq(schema.reviewerAssignments.reviewerId, reviewerId));
+      
+      return result.map(row => ({
+        ...row.assignment,
+        reviewer: row.reviewer,
+        car: row.car,
+        category: row.category
+      }));
+    } catch (error) {
+      console.error('Error fetching reviewer assignments for reviewer:', error);
+      return [];
+    }
+  }
+  
+  async getReviewerAssignmentsForCar(carId: number): Promise<ReviewerAssignmentWithDetails[]> {
+    try {
+      const result = await db
+        .select({
+          assignment: schema.reviewerAssignments,
+          reviewer: schema.users,
+          car: schema.cars,
+          category: schema.cujCategories
+        })
+        .from(schema.reviewerAssignments)
+        .leftJoin(schema.users, eq(schema.reviewerAssignments.reviewerId, schema.users.id))
+        .leftJoin(schema.cars, eq(schema.reviewerAssignments.carId, schema.cars.id))
+        .leftJoin(schema.cujCategories, eq(schema.reviewerAssignments.categoryId, schema.cujCategories.id))
+        .where(eq(schema.reviewerAssignments.carId, carId));
+      
+      return result.map(row => ({
+        ...row.assignment,
+        reviewer: row.reviewer,
+        car: row.car,
+        category: row.category
+      }));
+    } catch (error) {
+      console.error('Error fetching reviewer assignments for car:', error);
+      return [];
+    }
+  }
+  
+  async getReviewerAssignmentsForCategory(categoryId: number): Promise<ReviewerAssignmentWithDetails[]> {
+    try {
+      const result = await db
+        .select({
+          assignment: schema.reviewerAssignments,
+          reviewer: schema.users,
+          car: schema.cars,
+          category: schema.cujCategories
+        })
+        .from(schema.reviewerAssignments)
+        .leftJoin(schema.users, eq(schema.reviewerAssignments.reviewerId, schema.users.id))
+        .leftJoin(schema.cars, eq(schema.reviewerAssignments.carId, schema.cars.id))
+        .leftJoin(schema.cujCategories, eq(schema.reviewerAssignments.categoryId, schema.cujCategories.id))
+        .where(eq(schema.reviewerAssignments.categoryId, categoryId));
+      
+      return result.map(row => ({
+        ...row.assignment,
+        reviewer: row.reviewer,
+        car: row.car,
+        category: row.category
+      }));
+    } catch (error) {
+      console.error('Error fetching reviewer assignments for category:', error);
+      return [];
+    }
+  }
+  
+  async createReviewerAssignment(assignment: InsertReviewerAssignment): Promise<ReviewerAssignment> {
+    try {
+      // Check if there's already an assignment for this car+category combination
+      const existing = await db
+        .select()
+        .from(schema.reviewerAssignments)
+        .where(
+          and(
+            eq(schema.reviewerAssignments.carId, assignment.carId),
+            eq(schema.reviewerAssignments.categoryId, assignment.categoryId)
+          )
+        )
+        .limit(1);
+      
+      if (existing.length > 0) {
+        throw new Error(`A reviewer is already assigned to this car and category combination`);
+      }
+      
+      const result = await db
+        .insert(schema.reviewerAssignments)
+        .values(assignment)
+        .returning();
+      
+      return result[0];
+    } catch (error) {
+      console.error('Error creating reviewer assignment:', error);
+      throw error;
+    }
+  }
+  
+  async deleteReviewerAssignment(id: number): Promise<boolean> {
+    try {
+      const result = await db
+        .delete(schema.reviewerAssignments)
+        .where(eq(schema.reviewerAssignments.id, id))
+        .returning({ id: schema.reviewerAssignments.id });
+      
+      return result.length > 0;
+    } catch (error) {
+      console.error('Error deleting reviewer assignment:', error);
+      return false;
+    }
   }
 }

@@ -309,19 +309,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.post('/api/reviews', isAuthenticated, hasRole(['admin', 'reviewer']), async (req, res) => {
     try {
-      const reviewData = insertReviewSchema.parse(req.body);
+      console.log('Review creation request body:', req.body);
+      
+      // Check if the active CUJ database version is available
+      const activeVersion = await storage.getActiveCujDatabaseVersion();
+      
+      // Create a review data object with required fields
+      const reviewData = {
+        ...req.body,
+        cujDatabaseVersionId: activeVersion?.id || null
+      };
+      
+      console.log('Processed review data:', reviewData);
+      
+      // Parse and validate the data
+      const validatedData = insertReviewSchema.parse(reviewData);
       
       // Ensure the reviewerId matches the logged-in user for non-admin users
-      if (req.user && req.user.role !== 'admin' && reviewData.reviewerId !== req.user.id) {
+      if (req.user && req.user.role !== 'admin' && validatedData.reviewerId !== req.user.id) {
         return res.status(403).json({ 
           error: 'You can only create reviews assigned to yourself' 
         });
       }
       
-      const newReview = await storage.createReview(reviewData);
+      const newReview = await storage.createReview(validatedData);
+      console.log('New review created:', newReview);
       res.status(201).json(newReview);
     } catch (error) {
-      res.status(400).json({ error: String(error) });
+      console.error('Error creating review:', error);
+      if (error instanceof Error) {
+        res.status(400).json({ error: error.message });
+      } else {
+        res.status(400).json({ error: String(error) });
+      }
     }
   });
   
