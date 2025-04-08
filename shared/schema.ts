@@ -1,4 +1,5 @@
 import { pgTable, text, serial, integer, boolean, timestamp, foreignKey, json, varchar, doublePrecision } from "drizzle-orm/pg-core";
+import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -108,14 +109,15 @@ export const reviews = pgTable("reviews", {
   id: serial("id").primaryKey(),
   carId: integer("car_id").notNull().references(() => cars.id),
   reviewerId: integer("reviewer_id").notNull().references(() => users.id),
-  status: text("status").notNull().default("pending"), // pending, in_progress, completed
+  status: text("status").notNull().default("not_started"), // not_started, pending, in_progress, completed
   startDate: timestamp("start_date").notNull(),
   endDate: timestamp("end_date").notNull(),
   isPublished: boolean("is_published").default(false).notNull(), // Whether the review is locked and published
-  lastModifiedById: integer("last_modified_by_id").references(() => users.id),
+  createdBy: integer("created_by").references(() => users.id),
+  lastModifiedBy: integer("last_modified_by").references(() => users.id),
   cujDatabaseVersionId: integer("cuj_database_version_id").references(() => cujDatabaseVersions.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  lastModifiedAt: timestamp("last_modified_at").defaultNow().notNull(),
 });
 
 export const insertReviewSchema = createInsertSchema(reviews)
@@ -136,7 +138,7 @@ export const insertReviewSchema = createInsertSchema(reviews)
 export const updateReviewSchema = createInsertSchema(reviews).pick({
   status: true,
   isPublished: true,
-  lastModifiedById: true,
+  lastModifiedBy: true,
 });
 
 // Task Evaluations
@@ -247,37 +249,137 @@ export const insertReportSchema = createInsertSchema(reports).pick({
 });
 
 // Types
-export type User = typeof users.$inferSelect;
+export interface User {
+  id: number;
+  username: string;
+  password: string;
+  name: string;
+  role: string;
+}
 export type InsertUser = z.infer<typeof insertUserSchema>;
 
-export type CujDatabaseVersion = typeof cujDatabaseVersions.$inferSelect;
+export interface CujDatabaseVersion {
+  id: number;
+  versionNumber: string;
+  sourceType: string;
+  sourceFileName: string | null;
+  createdAt: Date;
+  createdBy: number | null;
+  isActive: boolean;
+}
 export type InsertCujDatabaseVersion = z.infer<typeof insertCujDatabaseVersionSchema>;
 
-export type CujCategory = typeof cujCategories.$inferSelect;
+export interface CujCategory {
+  id: number;
+  name: string;
+  description: string | null;
+  icon: string | null;
+}
 export type InsertCujCategory = z.infer<typeof insertCujCategorySchema>;
 
-export type Cuj = typeof cujs.$inferSelect;
+export interface Cuj {
+  id: number;
+  categoryId: number;
+  name: string;
+  description: string | null;
+}
 export type InsertCuj = z.infer<typeof insertCujSchema>;
 
-export type Task = typeof tasks.$inferSelect;
+export interface Task {
+  id: number;
+  cujId: number;
+  name: string;
+  prerequisites: string | null;
+  expectedOutcome: string;
+}
 export type InsertTask = z.infer<typeof insertTaskSchema>;
 
-export type Car = typeof cars.$inferSelect;
+export interface Car {
+  id: number;
+  make: string;
+  model: string;
+  year: number;
+  androidVersion: string;
+  buildFingerprint: string;
+  location: string;
+  imageUrl: string | null;
+}
 export type InsertCar = z.infer<typeof insertCarSchema>;
 
-export type Review = typeof reviews.$inferSelect;
+export interface Review {
+  id: number;
+  carId: number;
+  reviewerId: number;
+  status: string;
+  startDate: Date;
+  endDate: Date;
+  isPublished: boolean;
+  createdBy: number | null;
+  lastModifiedBy: number | null;
+  cujDatabaseVersionId: number | null;
+  createdAt: Date;
+  lastModifiedAt: Date;
+}
 export type InsertReview = z.infer<typeof insertReviewSchema>;
 
-export type TaskEvaluation = typeof taskEvaluations.$inferSelect;
+export interface TaskEvaluation {
+  id: number;
+  reviewId: number;
+  taskId: number;
+  doable: boolean | null;
+  undoableReason: string | null;
+  usabilityScore: number | null;
+  usabilityFeedback: string | null;
+  visualsScore: number | null;
+  visualsFeedback: string | null;
+  media: any[];
+  createdAt: Date;
+  updatedAt: Date;
+}
 export type InsertTaskEvaluation = z.infer<typeof insertTaskEvaluationSchema>;
 
-export type CategoryEvaluation = typeof categoryEvaluations.$inferSelect;
+export interface CategoryEvaluation {
+  id: number;
+  reviewId: number;
+  categoryId: number;
+  responsivenessScore: number | null;
+  responsivenessFeedback: string | null;
+  writingScore: number | null;
+  writingFeedback: string | null;
+  emotionalScore: number | null;
+  emotionalFeedback: string | null;
+  media: any[];
+  createdAt: Date;
+  updatedAt: Date;
+}
 export type InsertCategoryEvaluation = z.infer<typeof insertCategoryEvaluationSchema>;
 
-export type ScoringConfig = typeof scoringConfig.$inferSelect;
+export interface ScoringConfig {
+  id: number;
+  taskDoableWeight: number;
+  taskUsabilityWeight: number;
+  taskVisualsWeight: number;
+  categoryTasksWeight: number;
+  categoryResponsivenessWeight: number;
+  categoryWritingWeight: number;
+  categoryEmotionalWeight: number;
+  updatedAt: Date;
+  updatedBy: number | null;
+}
 export type InsertScoringConfig = z.infer<typeof insertScoringConfigSchema>;
 
-export type Report = typeof reports.$inferSelect;
+export interface Report {
+  id: number;
+  reviewId: number;
+  overallScore: number | null;
+  topLikes: string | null;
+  topHates: string | null;
+  benchmarkRank: number | null;
+  benchmarkComparison: string | null;
+  topIssues: any[];
+  createdAt: Date;
+  updatedAt: Date;
+}
 export type InsertReport = z.infer<typeof insertReportSchema>;
 
 // Extended types for API responses
@@ -287,11 +389,13 @@ export type TaskWithCategory = Task & {
   };
 };
 
-export type ReviewWithDetails = Review & {
+export type ReviewWithDetails = Omit<Review, 'lastModifiedBy' | 'cujDatabaseVersionId'> & {
   car: Car;
   reviewer: User;
   lastModifiedBy?: User;
+  lastModifiedById?: number | null;
   cujDatabaseVersion?: CujDatabaseVersion;
+  cujDatabaseVersionId?: number | null;
 };
 
 export type TaskEvaluationWithTask = TaskEvaluation & {
@@ -346,7 +450,15 @@ export const insertReviewerAssignmentSchema = createInsertSchema(reviewerAssignm
   createdBy: true,
 });
 
-export type ReviewerAssignment = typeof reviewerAssignments.$inferSelect;
+export interface ReviewerAssignment {
+  id: number;
+  reviewerId: number;
+  categoryId: number;
+  carId: number;
+  createdAt: Date;
+  createdBy: number | null;
+  updatedAt: Date;
+}
 export type InsertReviewerAssignment = z.infer<typeof insertReviewerAssignmentSchema>;
 
 export type ReviewerAssignmentWithDetails = ReviewerAssignment & {
@@ -397,3 +509,131 @@ export type ReviewStatus = typeof reviewStatuses[number];
 // User roles
 export const userRoles = ["reviewer", "internal", "external", "admin"] as const;
 export type UserRole = typeof userRoles[number];
+
+// Relations
+export const usersRelations = relations(users, ({ many }) => ({
+  reviews: many(reviews, { relationName: "user_reviews" }),
+  modifiedReviews: many(reviews, { relationName: "user_modified_reviews" }),
+  createdVersions: many(cujDatabaseVersions),
+  reviewerAssignments: many(reviewerAssignments),
+  createdAssignments: many(reviewerAssignments, { relationName: "created_assignments" }),
+}));
+
+export const cujDatabaseVersionsRelations = relations(cujDatabaseVersions, ({ one, many }) => ({
+  createdByUser: one(users, {
+    fields: [cujDatabaseVersions.createdBy],
+    references: [users.id],
+  }),
+  reviews: many(reviews),
+}));
+
+export const cujCategoriesRelations = relations(cujCategories, ({ many }) => ({
+  cujs: many(cujs),
+  categoryEvaluations: many(categoryEvaluations),
+  reviewerAssignments: many(reviewerAssignments),
+}));
+
+export const cujsRelations = relations(cujs, ({ one, many }) => ({
+  category: one(cujCategories, {
+    fields: [cujs.categoryId],
+    references: [cujCategories.id],
+  }),
+  tasks: many(tasks),
+}));
+
+export const tasksRelations = relations(tasks, ({ one, many }) => ({
+  cuj: one(cujs, {
+    fields: [tasks.cujId],
+    references: [cujs.id],
+  }),
+  taskEvaluations: many(taskEvaluations),
+}));
+
+export const carsRelations = relations(cars, ({ many }) => ({
+  reviews: many(reviews),
+  reviewerAssignments: many(reviewerAssignments),
+}));
+
+export const reviewsRelations = relations(reviews, ({ one, many }) => ({
+  car: one(cars, {
+    fields: [reviews.carId],
+    references: [cars.id],
+  }),
+  reviewer: one(users, {
+    fields: [reviews.reviewerId],
+    references: [users.id],
+    relationName: "user_reviews",
+  }),
+  createdByUser: one(users, {
+    fields: [reviews.createdBy],
+    references: [users.id],
+  }),
+  lastModifiedByUser: one(users, {
+    fields: [reviews.lastModifiedBy],
+    references: [users.id],
+    relationName: "user_modified_reviews",
+  }),
+  cujDatabaseVersion: one(cujDatabaseVersions, {
+    fields: [reviews.cujDatabaseVersionId],
+    references: [cujDatabaseVersions.id],
+  }),
+  taskEvaluations: many(taskEvaluations),
+  categoryEvaluations: many(categoryEvaluations),
+  reports: many(reports),
+}));
+
+export const taskEvaluationsRelations = relations(taskEvaluations, ({ one }) => ({
+  review: one(reviews, {
+    fields: [taskEvaluations.reviewId],
+    references: [reviews.id],
+  }),
+  task: one(tasks, {
+    fields: [taskEvaluations.taskId],
+    references: [tasks.id],
+  }),
+}));
+
+export const categoryEvaluationsRelations = relations(categoryEvaluations, ({ one }) => ({
+  review: one(reviews, {
+    fields: [categoryEvaluations.reviewId],
+    references: [reviews.id],
+  }),
+  category: one(cujCategories, {
+    fields: [categoryEvaluations.categoryId],
+    references: [cujCategories.id],
+  }),
+}));
+
+export const scoringConfigRelations = relations(scoringConfig, ({ one }) => ({
+  updatedByUser: one(users, {
+    fields: [scoringConfig.updatedBy],
+    references: [users.id],
+  }),
+}));
+
+export const reportsRelations = relations(reports, ({ one }) => ({
+  review: one(reviews, {
+    fields: [reports.reviewId],
+    references: [reviews.id],
+  }),
+}));
+
+export const reviewerAssignmentsRelations = relations(reviewerAssignments, ({ one }) => ({
+  reviewer: one(users, {
+    fields: [reviewerAssignments.reviewerId],
+    references: [users.id],
+  }),
+  category: one(cujCategories, {
+    fields: [reviewerAssignments.categoryId],
+    references: [cujCategories.id],
+  }),
+  car: one(cars, {
+    fields: [reviewerAssignments.carId],
+    references: [cars.id],
+  }),
+  createdByUser: one(users, {
+    fields: [reviewerAssignments.createdBy],
+    references: [users.id],
+    relationName: "created_assignments",
+  }),
+}));
