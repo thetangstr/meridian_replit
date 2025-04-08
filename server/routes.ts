@@ -67,15 +67,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(passport.session());
   
   // Configure local strategy - uses LDAP identifier only (no password required)
-  passport.use(new LocalStrategy(async (username, password, done) => {
+  passport.use(new LocalStrategy({
+    usernameField: 'username',
+    passwordField: 'password', // This is still needed for the structure
+    passReqToCallback: false,
+    session: true
+  }, async (username, password, done) => {
     try {
+      console.log(`Authenticating user with LDAP: ${username}`);
       const user = await storage.getUserByUsername(username);
       if (!user) {
+        console.log(`User not found: ${username}`);
         return done(null, false, { message: 'User not found with this LDAP identifier.' });
       }
       // No password check - we only validate based on LDAP identifier
+      console.log(`User authenticated: ${username} (${user.id})`);
       return done(null, user);
     } catch (err) {
+      console.error('Authentication error:', err);
       return done(err);
     }
   }));
@@ -118,8 +127,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
   
   // Authentication routes
-  app.post('/api/auth/login', passport.authenticate('local'), (req, res) => {
-    res.json(req.user);
+  app.post('/api/auth/login', (req, res, next) => {
+    console.log('Login request received:', req.body);
+    passport.authenticate('local', (err, user, info) => {
+      if (err) {
+        console.error('Authentication error:', err);
+        return res.status(500).json({ message: 'Internal server error during login' });
+      }
+      
+      if (!user) {
+        console.log('Auth failed:', info?.message || 'Unknown reason');
+        return res.status(401).json({ message: info?.message || 'Invalid credentials' });
+      }
+      
+      req.login(user, (loginErr) => {
+        if (loginErr) {
+          console.error('Session error:', loginErr);
+          return res.status(500).json({ message: 'Failed to establish session' });
+        }
+        
+        console.log('Login successful for user:', user.username);
+        return res.json(user);
+      });
+    })(req, res, next);
   });
   
   app.post('/api/auth/logout', (req: any, res, next) => {

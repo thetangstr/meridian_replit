@@ -125,7 +125,7 @@ export default function Login() {
               />
 
               <Button type="submit" className="w-full" disabled={isLoggingIn}>
-                {isLoggingIn ? "Logging in..." : "Sign In"}
+                {isLoggingIn ? "Logging in..." : "Go"}
               </Button>
               
               <div className="mt-4">
