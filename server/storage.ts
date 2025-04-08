@@ -1518,7 +1518,7 @@ export class MemStorage implements IStorage {
   }
 }
 
-// TODO: Switch to database storage once implementation is complete
+// TODO: We need to run database migrations before we can use DbStorage
 // import { DbStorage } from "./dbStorage";
 // export const storage = new DbStorage();
 
