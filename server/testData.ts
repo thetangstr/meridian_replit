@@ -30,11 +30,15 @@ export function createTestStorage(): MemStorage {
   // Create users
   const admin: User = { id: storage.userIdCounter++, username: "admin", password: "admin123", name: "Admin User", role: "admin" };
   const reviewer: User = { id: storage.userIdCounter++, username: "reviewer", password: "review123", name: "Test Reviewer", role: "reviewer" };
+  const tony: User = { id: storage.userIdCounter++, username: "tony", password: "password123", name: "Tony", role: "reviewer" };
+  const victor: User = { id: storage.userIdCounter++, username: "victor", password: "password123", name: "Victor", role: "reviewer" };
   const internal: User = { id: storage.userIdCounter++, username: "internal", password: "internal123", name: "Internal Stakeholder", role: "internal" };
   const external: User = { id: storage.userIdCounter++, username: "external", password: "external123", name: "External Viewer", role: "external" };
   
   storage.users.set(admin.id, admin);
   storage.users.set(reviewer.id, reviewer);
+  storage.users.set(tony.id, tony);
+  storage.users.set(victor.id, victor);
   storage.users.set(internal.id, internal);
   storage.users.set(external.id, external);
   
