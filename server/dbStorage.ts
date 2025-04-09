@@ -192,7 +192,7 @@ export class DbStorage implements IStorage {
   async updateReviewStatus(id: number, status: string): Promise<Review> {
     const result = await db
       .update(reviews)
-      .set({ status, updatedAt: new Date() })
+      .set({ status, lastModifiedAt: new Date() })
       .where(eq(reviews.id, id))
       .returning();
     
@@ -219,8 +219,8 @@ export class DbStorage implements IStorage {
     
     const updateData: any = {
       ...data,
-      lastModifiedById,
-      updatedAt: new Date()
+      lastModifiedBy: lastModifiedById, // Fix the field name to match the schema
+      lastModifiedAt: new Date() // Use lastModifiedAt instead of updatedAt
     };
     
     const result = await db
@@ -273,9 +273,23 @@ export class DbStorage implements IStorage {
 
   async updateTaskEvaluation(reviewId: number, taskId: number, evaluation: InsertTaskEvaluation): Promise<TaskEvaluation> {
     const now = new Date();
+    // Create a copy of the evaluation object without any non-schema fields
+    // to avoid the "undefined column name" error
+    const validFields = {
+      reviewId: evaluation.reviewId,
+      taskId: evaluation.taskId,
+      doable: evaluation.doable,
+      undoableReason: evaluation.undoableReason,
+      usabilityScore: evaluation.usabilityScore,
+      usabilityFeedback: evaluation.usabilityFeedback,
+      visualsScore: evaluation.visualsScore,
+      visualsFeedback: evaluation.visualsFeedback,
+      media: evaluation.media,
+    };
+
     const result = await db
       .update(taskEvaluations)
-      .set({ ...evaluation, updatedAt: now })
+      .set({ ...validFields, updatedAt: now })
       .where(
         and(
           eq(taskEvaluations.reviewId, reviewId),
@@ -329,9 +343,23 @@ export class DbStorage implements IStorage {
 
   async updateCategoryEvaluation(reviewId: number, categoryId: number, evaluation: InsertCategoryEvaluation): Promise<CategoryEvaluation> {
     const now = new Date();
+    // Create a copy of the evaluation object without any non-schema fields
+    // to avoid the "undefined column name" error
+    const validFields = {
+      reviewId: evaluation.reviewId,
+      categoryId: evaluation.categoryId,
+      responsivenessScore: evaluation.responsivenessScore,
+      responsivenessFeedback: evaluation.responsivenessFeedback,
+      writingScore: evaluation.writingScore,
+      writingFeedback: evaluation.writingFeedback,
+      emotionalScore: evaluation.emotionalScore,
+      emotionalFeedback: evaluation.emotionalFeedback,
+      media: evaluation.media,
+    };
+
     const result = await db
       .update(categoryEvaluations)
-      .set({ ...evaluation, updatedAt: now })
+      .set({ ...validFields, updatedAt: now })
       .where(
         and(
           eq(categoryEvaluations.reviewId, reviewId),
@@ -367,15 +395,22 @@ export class DbStorage implements IStorage {
 
   async updateTaskScoringConfig(config: Partial<ScoringConfig>): Promise<ScoringConfig> {
     const currentConfig = await this.getScoringConfig();
+    
+    // Check the schema for the field name
+    const scoringConfigFields = {
+      taskDoableWeight: config.taskDoableWeight ?? currentConfig.taskDoableWeight,
+      taskUsabilityWeight: config.taskUsabilityWeight ?? currentConfig.taskUsabilityWeight,
+      taskVisualsWeight: config.taskVisualsWeight ?? currentConfig.taskVisualsWeight
+    };
+    
+    // If updatedBy and updatedAt are valid fields in the schema, add them
+    if (config.updatedBy) {
+      Object.assign(scoringConfigFields, { updatedBy: config.updatedBy });
+    }
+    
     const updatedConfig = await db
       .update(scoringConfig)
-      .set({
-        taskDoableWeight: config.taskDoableWeight ?? currentConfig.taskDoableWeight,
-        taskUsabilityWeight: config.taskUsabilityWeight ?? currentConfig.taskUsabilityWeight,
-        taskVisualsWeight: config.taskVisualsWeight ?? currentConfig.taskVisualsWeight,
-        updatedAt: new Date(),
-        updatedBy: config.updatedBy
-      })
+      .set(scoringConfigFields)
       .where(eq(scoringConfig.id, currentConfig.id))
       .returning();
     
@@ -384,16 +419,23 @@ export class DbStorage implements IStorage {
 
   async updateCategoryScoringConfig(config: Partial<ScoringConfig>): Promise<ScoringConfig> {
     const currentConfig = await this.getScoringConfig();
+    
+    // Check the schema for the field name
+    const scoringConfigFields = {
+      categoryTasksWeight: config.categoryTasksWeight ?? currentConfig.categoryTasksWeight,
+      categoryResponsivenessWeight: config.categoryResponsivenessWeight ?? currentConfig.categoryResponsivenessWeight,
+      categoryWritingWeight: config.categoryWritingWeight ?? currentConfig.categoryWritingWeight,
+      categoryEmotionalWeight: config.categoryEmotionalWeight ?? currentConfig.categoryEmotionalWeight
+    };
+    
+    // If updatedBy is a valid field in the schema, add it
+    if (config.updatedBy) {
+      Object.assign(scoringConfigFields, { updatedBy: config.updatedBy });
+    }
+    
     const updatedConfig = await db
       .update(scoringConfig)
-      .set({
-        categoryTasksWeight: config.categoryTasksWeight ?? currentConfig.categoryTasksWeight,
-        categoryResponsivenessWeight: config.categoryResponsivenessWeight ?? currentConfig.categoryResponsivenessWeight,
-        categoryWritingWeight: config.categoryWritingWeight ?? currentConfig.categoryWritingWeight,
-        categoryEmotionalWeight: config.categoryEmotionalWeight ?? currentConfig.categoryEmotionalWeight,
-        updatedAt: new Date(),
-        updatedBy: config.updatedBy
-      })
+      .set(scoringConfigFields)
       .where(eq(scoringConfig.id, currentConfig.id))
       .returning();
     
@@ -481,10 +523,24 @@ export class DbStorage implements IStorage {
   }
 
   async updateReport(id: number, reportUpdate: Partial<InsertReport>): Promise<Report> {
-    const now = new Date();
+    // Create a copy of valid fields to avoid column name errors
+    const validFields: any = {};
+    
+    // Copy only the fields that exist in the schema
+    if ('reviewId' in reportUpdate) validFields.reviewId = reportUpdate.reviewId;
+    if ('overallScore' in reportUpdate) validFields.overallScore = reportUpdate.overallScore;
+    if ('topLikes' in reportUpdate) validFields.topLikes = reportUpdate.topLikes;
+    if ('topHates' in reportUpdate) validFields.topHates = reportUpdate.topHates;
+    if ('benchmarkRank' in reportUpdate) validFields.benchmarkRank = reportUpdate.benchmarkRank;
+    if ('benchmarkComparison' in reportUpdate) validFields.benchmarkComparison = reportUpdate.benchmarkComparison;
+    if ('topIssues' in reportUpdate) validFields.topIssues = reportUpdate.topIssues;
+    
+    // Add the updated timestamp using the correct field name
+    validFields.updatedAt = new Date();
+    
     const result = await db
       .update(reports)
-      .set({ ...reportUpdate, updatedAt: now })
+      .set(validFields)
       .where(eq(reports.id, id))
       .returning();
     

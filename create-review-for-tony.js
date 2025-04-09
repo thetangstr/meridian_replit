@@ -9,6 +9,7 @@ async function loginAsTony() {
     },
     body: JSON.stringify({
       username: 'tony',
+      password: 'password123' // Include the actual password for Tony from the database
     }),
   });
 
