@@ -59,7 +59,7 @@ app.use((req, res, next) => {
   // Serve the app on port 3000 by default
   // this serves both the API and the client
   const port = process.env.PORT || 3000;
-  server.listen(Number(port), '127.0.0.1', () => {
-    log(`serving on http://127.0.0.1:${port}`);
+  app.listen(port, () => {
+    log(`serving on http://localhost:${port}`);
   });
 })();
