@@ -19,7 +19,11 @@ function PrivateRoute({ component: Component, roles, ...rest }: any) {
   const { isAuthenticated, user, loading } = useAuth();
   
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-50 to-gray-100">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+      </div>
+    );
   }
   
   if (!isAuthenticated) {
@@ -38,7 +42,11 @@ function AuthRoute({ component: Component, ...rest }: any) {
   const { isAuthenticated, loading } = useAuth();
   
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-50 to-gray-100">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+      </div>
+    );
   }
   
   if (isAuthenticated) {
@@ -77,10 +85,10 @@ function Router() {
   // If not authenticated and not on login page, show a temporary loading state
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-50 to-gray-100">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mx-auto mb-4"></div>
-          <div>Loading...</div>
+          <div className="text-muted-foreground">Loading...</div>
         </div>
       </div>
     );
@@ -149,7 +157,7 @@ function App() {
   } catch (error) {
     console.error("Error rendering app:", error);
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-4">
+      <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-to-b from-gray-50 to-gray-100">
         <h1 className="text-xl font-bold mb-4">Something went wrong</h1>
         <p className="text-red-500">{error instanceof Error ? error.message : "Unknown error"}</p>
       </div>

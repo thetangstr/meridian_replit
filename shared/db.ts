@@ -1,3 +1,16 @@
+import Database from 'better-sqlite3';
 
-// In-memory storage only, file kept for compatibility
-export const db = null;
+const db = new Database('dev.db');
+
+// Create users table if it doesn't exist
+db.exec(`
+  CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL UNIQUE,
+    password TEXT NOT NULL,
+    name TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'reviewer'
+  );
+`);
+
+export { db };

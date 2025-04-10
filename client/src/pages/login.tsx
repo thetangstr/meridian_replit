@@ -78,27 +78,27 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1 text-center">
-          <div className="flex justify-center mb-4">
-            <div className="bg-primary bg-opacity-10 p-3 rounded-full">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-50 to-gray-100 px-4">
+      <Card className="w-full max-w-md shadow-lg border-0">
+        <CardHeader className="space-y-3 text-center pb-2">
+          <div className="flex justify-center mb-2">
+            <div className="bg-primary/10 p-3 rounded-full">
               <Car className="h-8 w-8 text-primary" />
             </div>
           </div>
-          <CardTitle className="text-2xl font-bold">Score My Car</CardTitle>
-          <CardDescription>
+          <CardTitle className="text-3xl font-bold tracking-tight">Score My Car</CardTitle>
+          <CardDescription className="text-base">
             Enter your credentials to access your account
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-4">
           {loginAttempts > 0 && (
-            <Alert variant="destructive" className="mb-4">
+            <Alert variant="destructive" className="mb-6">
               <AlertCircle className="h-4 w-4" />
               <AlertTitle>Login Failed</AlertTitle>
               <AlertDescription>
                 Please use one of the following test accounts:
-                <div className="mt-2 text-xs bg-white/20 p-2 rounded">
+                <div className="mt-2 text-xs bg-white/20 p-3 rounded space-y-1">
                   <div><strong>Reviewer:</strong> username: reviewer</div>
                   <div><strong>Admin:</strong> username: admin</div>
                   <div><strong>Internal:</strong> username: internal</div>
@@ -109,57 +109,69 @@ export default function Login() {
           )}
           
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
               <FormField
                 control={form.control}
                 name="username"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Username</FormLabel>
+                    <FormLabel className="text-sm font-medium">Username</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter your username" {...field} />
+                      <Input 
+                        placeholder="Enter your username" 
+                        {...field} 
+                        className="h-11"
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
-              <Button type="submit" className="w-full" disabled={isLoggingIn}>
-                {isLoggingIn ? "Logging in..." : "Go"}
+              <Button 
+                type="submit" 
+                className="w-full h-11 text-base font-medium" 
+                disabled={isLoggingIn}
+              >
+                {isLoggingIn ? "Logging in..." : "Sign In"}
               </Button>
               
-              <div className="mt-4">
-                <p className="text-xs text-center mb-2 text-gray-500">Quick access demo accounts:</p>
-                <div className="grid grid-cols-2 gap-2">
+              <div className="mt-6">
+                <p className="text-sm text-center mb-3 text-muted-foreground">Quick access demo accounts:</p>
+                <div className="grid grid-cols-2 gap-3">
                   <Button 
                     type="button" 
                     variant="outline" 
-                    size="sm"
+                    size="lg"
                     onClick={() => fillDemoCredentials('reviewer')}
+                    className="h-11"
                   >
                     Reviewer
                   </Button>
                   <Button 
                     type="button" 
                     variant="outline" 
-                    size="sm"
+                    size="lg"
                     onClick={() => fillDemoCredentials('admin')}
+                    className="h-11"
                   >
                     Admin
                   </Button>
                   <Button 
                     type="button" 
                     variant="outline" 
-                    size="sm"
+                    size="lg"
                     onClick={() => fillDemoCredentials('internal')}
+                    className="h-11"
                   >
                     Internal
                   </Button>
                   <Button 
                     type="button" 
                     variant="outline" 
-                    size="sm"
+                    size="lg"
                     onClick={() => fillDemoCredentials('external')}
+                    className="h-11"
                   >
                     External
                   </Button>
@@ -168,8 +180,8 @@ export default function Login() {
             </form>
           </Form>
         </CardContent>
-        <CardFooter className="flex-col">
-          <p className="text-sm text-center text-gray-500 mt-4">
+        <CardFooter className="flex-col pt-0">
+          <p className="text-sm text-center text-muted-foreground">
             Car evaluation platform for internal reviewers, stakeholders and administrators.
           </p>
         </CardFooter>
