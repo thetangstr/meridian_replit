@@ -1,4 +1,4 @@
-import { MemStorage } from './storage';
+import { MemStorage } from './memStorage';
 import type { Cuj, CujCategory, Task, Car, User, Review, InsertTaskEvaluation, InsertCategoryEvaluation } from '../shared/schema';
 
 /**

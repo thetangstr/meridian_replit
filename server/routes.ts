@@ -1,7 +1,6 @@
 import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { initializeStorageWithTestData } from "./storageSetup";
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import session from "express-session";
@@ -49,8 +48,7 @@ interface AuthenticatedRequest extends Request {
 const MemoryStore = memoryStore(session);
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Initialize storage with test data
-  initializeStorageWithTestData();
+  // No initialization needed - test data is loaded through storage.ts
   
   // Add session middleware
   app.use(session({

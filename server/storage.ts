@@ -1519,7 +1519,6 @@ export class MemStorage implements IStorage {
 }
 
 // Use in-memory storage
-import { MemStorage } from "./dbStorage";
 import { createTestStorage } from "./testData";
 
 export const storage = createTestStorage();
